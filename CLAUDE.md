@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT: Directory Access Rules
+
+**READ THIS FIRST**: See `DIRECTORY_RULES.md` for absolute rules on which directories can be modified by Claude Code vs Codex. These rules MUST be followed at all times.
+
 ## Project Overview
 
 A personal daily life assistant. Scripts handle tasks like summarizing URLs, extracting YouTube transcripts, and other daily utilities. Outputs (summaries, notes, etc.) are saved to an Obsidian vault.

@@ -268,7 +268,7 @@ def resolve_output_path(title: str, env_values: dict[str, str]) -> tuple[Path, s
     output_dir = (Path(vault).expanduser() / youtube_dir.lstrip("/")).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     date_prefix = datetime.now().strftime("%Y-%m-%d")
-    filename = f"{date_prefix} {clean_filename(title)}.md"
+    filename = f"{date_prefix} {clean_filename(title)} (codex).md"
     output_path = output_dir / filename
     output_rel = f"{youtube_dir.rstrip('/')}/{filename}"
     return output_path, output_rel

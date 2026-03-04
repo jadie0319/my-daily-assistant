@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+## IMPORTANT: Directory Access Rules
+
+**READ THIS FIRST**: See `DIRECTORY_RULES.md` for absolute rules on which directories can be modified by Claude Code vs Codex. These rules MUST be followed at all times.
+
 ## Project Structure & Module Organization
 This repo focuses on Obsidian automation for YouTube summarization.
 
