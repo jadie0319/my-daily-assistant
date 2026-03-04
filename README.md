@@ -56,7 +56,7 @@ my-daily-assistant/
 
 ```bash
 OBSIDIAN_VAULT=/path/to/your/obsidian/vault/
-YOUTUBE_DIR=/02.Zettelkasten/youtube
+YOUTUBE_DIR=/02.Zattelkasten/001_Inbox
 ```
 
 파일시스템이나 외부 서비스와 상호작용하는 모든 스크립트는 이 파일을 먼저 읽습니다.
@@ -99,7 +99,7 @@ YouTube 영상의 자막을 추출·번역하여 Obsidian 노트로 저장합니
 ./.codex/bin/youtube-progress   # 진행 상태 확인
 ```
 
-출력 위치: `{OBSIDIAN_VAULT}/02.Zettelkasten/youtube/`
+출력 위치: `{OBSIDIAN_VAULT}/02.Zattelkasten/001_Inbox/`
 
 ---
 

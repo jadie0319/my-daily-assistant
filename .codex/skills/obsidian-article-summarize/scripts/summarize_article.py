@@ -10,18 +10,21 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 THIS_FILE = Path(__file__).resolve()
 REPO_ROOT = THIS_FILE.parents[4]
 PROGRESS_DIR = REPO_ROOT / ".codex" / "article-progress"
-TRANSCRIPT_SCRIPT = THIS_FILE.with_name("get_youtube_transcript.py")
-DEFAULT_YOUTUBE_DIR = "/02.Zattelkasten/001_Inbox"
+EXTRACT_SCRIPT = THIS_FILE.with_name("extract_article.py")
+DEFAULT_ARTICLE_DIR = "/02.Zattelkasten/001_Inbox"
+DEFAULT_ATTACHMENT_DIR = "/99.Attachments"
 
 
 @dataclass
 class SummaryInput:
     lang: str
-    text: str
+    url: str
 
 
 def now_iso() -> str:
@@ -43,36 +46,26 @@ def load_env_config(path: Path) -> dict[str, str]:
 
 def parse_user_input(arguments: list[str]) -> SummaryInput:
     if not arguments:
-        raise ValueError("Usage: summarize_youtube.py [--sync] [kr|en] <youtube_url|transcript>")
+        raise ValueError("Usage: summarize_article.py [--sync] [kr|en] <article_url>")
+
     first = arguments[0].lower()
     if first in {"kr", "ko", "en"}:
         lang = "kr" if first in {"kr", "ko"} else "en"
-        text = " ".join(arguments[1:]).strip()
+        url = " ".join(arguments[1:]).strip()
     else:
         lang = "kr"
-        text = " ".join(arguments).strip()
-    if not text:
-        raise ValueError("Input is empty after language parsing")
-    return SummaryInput(lang=lang, text=text)
+        url = " ".join(arguments).strip()
+
+    if not url:
+        raise ValueError("Article URL is empty")
+
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Article URL must start with http:// or https://")
+    return SummaryInput(lang=lang, url=url)
 
 
-def is_youtube_url(text: str) -> bool:
-    return ("youtube.com/watch?v=" in text) or ("youtu.be/" in text)
-
-
-def extract_video_id(url: str) -> str | None:
-    patterns = [
-        r"(?:v=|/)([0-9A-Za-z_-]{11}).*",
-        r"(?:be/)([0-9A-Za-z_-]{11}).*",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            return match.group(1)
-    return None
-
-
-def slugify(value: str, fallback: str = "manual") -> str:
+def slugify(value: str, fallback: str = "article") -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or fallback
 
@@ -83,51 +76,11 @@ def clean_filename(value: str) -> str:
     return cleaned[:120] or "untitled"
 
 
-def channel_to_author(channel: str | None) -> str:
-    if not channel:
+def normalize_author(author: str | None) -> str:
+    if not author:
         return "unknown"
-    normalized = re.sub(r"\s+", " ", channel).strip()
-    return normalized or "unknown"
-
-
-def make_manual_title(text: str) -> str:
-    words = re.sub(r"\s+", " ", text).strip().split(" ")
-    title = " ".join(words[:8]).strip()
-    if not title:
-        return "Manual Transcript"
-    return title[:100]
-
-
-def write_progress(path: Path, payload: dict[str, object]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def create_progress_file(input_text: str) -> Path:
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    if is_youtube_url(input_text):
-        key = extract_video_id(input_text) or "youtube"
-    else:
-        key = slugify(input_text[:40], fallback="manual")
-    return PROGRESS_DIR / f"{timestamp}-youtube-{key}.json"
-
-
-def run_transcript_extractor(url: str, lang: str) -> dict[str, str]:
-    cmd = [sys.executable, str(TRANSCRIPT_SCRIPT), url, lang]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or "transcript extraction failed"
-        raise RuntimeError(message)
-    try:
-        payload = json.loads(result.stdout.strip())
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"invalid transcript JSON: {exc}") from exc
-    if payload.get("error"):
-        raise RuntimeError(str(payload["error"]))
-    transcript = payload.get("transcript")
-    if not transcript:
-        raise RuntimeError("transcript is empty")
-    return payload
+    text = re.sub(r"\s+", " ", author).strip()
+    return text or "unknown"
 
 
 def yaml_quote(value: str) -> str:
@@ -135,10 +88,43 @@ def yaml_quote(value: str) -> str:
     return f"\"{escaped}\""
 
 
+def write_progress(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def create_progress_file(url: str) -> Path:
+    parsed = urlparse(url)
+    key = slugify(f"{parsed.netloc}-{parsed.path}", fallback="article")[:48]
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return PROGRESS_DIR / f"{timestamp}-article-{key}.json"
+
+
+def run_article_extractor(url: str) -> dict[str, object]:
+    result = subprocess.run(
+        [sys.executable, str(EXTRACT_SCRIPT), url],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip() or "article extraction failed"
+        raise RuntimeError(message)
+    try:
+        payload = json.loads(result.stdout.strip())
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"invalid article JSON: {exc}") from exc
+    if payload.get("error"):
+        raise RuntimeError(str(payload["error"]))
+    if not payload.get("content"):
+        raise RuntimeError("article content is empty")
+    return payload
+
+
 def build_prompt(
     *,
     lang: str,
-    transcript_file: Path,
+    article_file: Path,
     title: str,
     author: str,
     created_at: str,
@@ -146,39 +132,44 @@ def build_prompt(
 ) -> str:
     output_language = "Korean" if lang == "kr" else "English"
     translation_rule = (
-        "Translate to Korean. Keep important technical terms in English in parentheses on first mention."
+        "Translate the article into Korean and keep original English technical terms in parentheses on first mention."
         if lang == "kr"
-        else "Write in English and keep technical terms precise."
+        else "Write in English and preserve original technical terms accurately."
     )
     return f"""
-You are writing one Obsidian markdown note from a transcript.
-
-Read transcript from this local file: {transcript_file}
+You are a technical translator and software engineering writer.
+Read article text from this local file: {article_file}
 
 Output constraints:
 - Output markdown only. No code fences.
+- Do not add facts not present in the source text.
 - Use this exact frontmatter field order:
   1) id
   2) aliases
   3) tags
   4) author
-  5) created_at
-  6) related
-  7) source
-  8) tool
-- Keep tags hierarchical with '/' separators, lowercase, no spaces, max 6 tags.
-- If uncertain, mark it explicitly in the body.
-- Include code examples or pseudocode if they are present in the transcript.
+  5) tool
+  6) created_at
+  7) related
+  8) source
+- Keep tags hierarchical with '/' separators, lowercase, and max 6 tags.
+- If uncertain, mark uncertain parts explicitly.
+- Include code snippets/pseudocode from source when available.
 
 Language and style:
 - Final language: {output_language}
 - {translation_rule}
-- Use professional engineering terminology.
+- Use professional software engineering terminology.
 
 Required body structure:
-1) Highlights/Summary: 2-3 paragraphs.
-2) Detailed Summary: split by about 5-minute sections when timestamps are available; 2-3 paragraphs per section.
-3) Conclusion and Personal Views: 5-10 bullet statements.
+## 1. Highlights/Summary
+2-3 paragraphs summarizing the full article.
+
+## 2. Detailed Summary
+Split by logical subtopics/subheadings, 2-3 paragraphs per section.
+
+## 3. Conclusion and Personal View
+5-10 bullet statements and why this article matters for practitioners.
 
 Use this metadata exactly:
 - id: {title}
@@ -194,13 +185,11 @@ aliases: <translated title when useful, otherwise same as id>
 tags:
   - <tag-1>
 author: {yaml_quote(author)}
+tool: codex
 created_at: {yaml_quote(created_at)}
 related: []
 source: {yaml_quote(source)}
-tool: "codex"
 ---
-
-Now produce the final note.
 """.strip()
 
 
@@ -246,71 +235,140 @@ def run_codex_summary(prompt: str, output_file: Path) -> None:
         str(output_file),
         "-",
     ]
-    result = subprocess.run(
-        cmd,
-        input=prompt,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    result = subprocess.run(cmd, input=prompt, text=True, capture_output=True, check=False)
     if result.returncode != 0:
         stderr = result.stderr.strip()
         stdout = result.stdout.strip()
-        message = stderr or stdout or "codex exec failed"
-        raise RuntimeError(message)
+        raise RuntimeError(stderr or stdout or "codex exec failed")
 
 
 def resolve_output_path(title: str, env_values: dict[str, str]) -> tuple[Path, str]:
     vault = env_values.get("OBSIDIAN_VAULT")
     if not vault:
         raise RuntimeError("OBSIDIAN_VAULT is missing in env.config")
-    youtube_dir = env_values.get("YOUTUBE_DIR") or DEFAULT_YOUTUBE_DIR
-    output_dir = (Path(vault).expanduser() / youtube_dir.lstrip("/")).resolve()
+    article_dir = env_values.get("ARTICLE_DIR") or DEFAULT_ARTICLE_DIR
+    output_dir = (Path(vault).expanduser() / article_dir.lstrip("/")).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     date_prefix = datetime.now().strftime("%Y-%m-%d")
     filename = f"{date_prefix} {clean_filename(title)} (codex).md"
     output_path = output_dir / filename
-    output_rel = f"{youtube_dir.rstrip('/')}/{filename}"
+    output_rel = f"{article_dir.rstrip('/')}/{filename}"
     return output_path, output_rel
+
+
+def resolve_attachment_dir(env_values: dict[str, str]) -> tuple[Path, str]:
+    vault = env_values.get("OBSIDIAN_VAULT")
+    if not vault:
+        raise RuntimeError("OBSIDIAN_VAULT is missing in env.config")
+    attachment_dir = env_values.get("ATTACHMENT_DIR") or DEFAULT_ATTACHMENT_DIR
+    abs_dir = (Path(vault).expanduser() / attachment_dir.lstrip("/")).resolve()
+    abs_dir.mkdir(parents=True, exist_ok=True)
+    rel_dir = attachment_dir.lstrip("/")
+    return abs_dir, rel_dir
+
+
+def infer_ext(path: str) -> str:
+    lower = path.lower()
+    for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"]:
+        if lower.endswith(ext):
+            return ext
+    return ".img"
+
+
+def build_attachment_name(index: int, image_url: str) -> str:
+    parsed = urlparse(image_url)
+    stem = Path(parsed.path).stem or f"image-{index:02d}"
+    ext = infer_ext(parsed.path)
+    safe_stem = slugify(stem, fallback=f"image-{index:02d}")[:50]
+    return f"article-{index:02d}-{safe_stem}{ext}"
+
+
+def download_one(url: str, dest: Path) -> None:
+    req = Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+            ),
+        },
+    )
+    with urlopen(req, timeout=45) as response:  # noqa: S310
+        data = response.read()
+    dest.write_bytes(data)
+
+
+def download_images(
+    images: list[dict[str, str]],
+    attachment_abs_dir: Path,
+    attachment_rel_dir: str,
+) -> tuple[list[str], list[str]]:
+    embeds: list[str] = []
+    failures: list[str] = []
+
+    for idx, item in enumerate(images, 1):
+        src = str(item.get("src", "")).strip()
+        if not src:
+            continue
+        filename = build_attachment_name(idx, src)
+        target = attachment_abs_dir / filename
+        try:
+            download_one(src, target)
+            embeds.append(f"{attachment_rel_dir}/{filename}")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{src} ({exc})")
+    return embeds, failures
+
+
+def append_image_section(markdown: str, embeds: list[str], failures: list[str]) -> str:
+    lines: list[str] = []
+    if embeds:
+        lines.append("## Images")
+        for rel_path in embeds:
+            lines.append(f"![[{rel_path}]]")
+    if failures:
+        lines.append("## Image Download Failures")
+        for failure in failures:
+            lines.append(f"- {failure}")
+
+    if not lines:
+        return markdown
+    return markdown.rstrip() + "\n\n" + "\n".join(lines) + "\n"
 
 
 def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
     progress_payload = json.loads(progress_file.read_text(encoding="utf-8"))
     try:
         env_values = load_env_config(REPO_ROOT / "env.config")
+        article_data = run_article_extractor(user_input.url)
 
-        if is_youtube_url(user_input.text):
-            yt_data = run_transcript_extractor(user_input.text, user_input.lang)
-            title = yt_data.get("title") or f"YouTube {yt_data.get('video_id', '')}".strip()
-            author = channel_to_author(yt_data.get("channel"))
-            source = user_input.text
-            transcript = yt_data["transcript"]
-        else:
-            title = make_manual_title(user_input.text)
-            author = "unknown"
-            source = "manual-input"
-            transcript = user_input.text
+        title = str(article_data.get("title") or f"Article {urlparse(user_input.url).netloc}").strip()
+        author = normalize_author(str(article_data.get("author") or ""))
+        content = str(article_data.get("content") or "")
+        images = article_data.get("images") or []
+        if not isinstance(images, list):
+            images = []
 
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         output_path, output_rel = resolve_output_path(title, env_values)
+        attachment_abs_dir, attachment_rel_dir = resolve_attachment_dir(env_values)
 
-        with tempfile.TemporaryDirectory(
-            prefix="codex-youtube-",
-            dir=PROGRESS_DIR,
-        ) as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix="codex-article-", dir=PROGRESS_DIR) as tmp_dir:
             tmp_root = Path(tmp_dir)
-            transcript_file = tmp_root / "transcript.txt"
-            transcript_file.write_text(transcript, encoding="utf-8")
+            content_file = tmp_root / "article.txt"
+            content_file.write_text(content, encoding="utf-8")
             summary_file = tmp_root / "summary.md"
+
             prompt = build_prompt(
                 lang=user_input.lang,
-                transcript_file=transcript_file,
+                article_file=content_file,
                 title=title,
                 author=author,
                 created_at=created_at,
-                source=source,
+                source=user_input.url,
             )
             run_codex_summary(prompt, summary_file)
+
             summary = summary_file.read_text(encoding="utf-8").strip()
             summary = ensure_frontmatter_properties(
                 summary,
@@ -318,13 +376,14 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                     "id": yaml_quote(title),
                     "author": yaml_quote(author),
                     "tool": "codex",
-                    "source": yaml_quote(source),
+                    "source": yaml_quote(user_input.url),
                 },
             )
-            if not summary:
-                raise RuntimeError("codex returned empty summary")
 
-        output_path.write_text(summary + "\n", encoding="utf-8")
+            image_embeds, image_failures = download_images(images, attachment_abs_dir, attachment_rel_dir)
+            summary = append_image_section(summary, image_embeds, image_failures)
+
+        output_path.write_text(summary.rstrip() + "\n", encoding="utf-8")
 
         progress_payload["status"] = "completed"
         progress_payload["completed_at"] = now_iso()
@@ -332,7 +391,6 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
         progress_payload["error"] = None
         write_progress(progress_file, progress_payload)
         return 0
-
     except Exception as exc:  # noqa: BLE001
         progress_payload["status"] = "failed"
         progress_payload["completed_at"] = now_iso()
@@ -350,30 +408,28 @@ def launch_background_worker(user_input: SummaryInput, progress_file: Path) -> i
         "--worker",
         "--lang",
         user_input.lang,
-        "--input",
-        user_input.text,
+        "--url",
+        user_input.url,
         "--progress-file",
         str(progress_file),
     ]
     with log_file.open("a", encoding="utf-8") as stream:
-        process = subprocess.Popen(  # noqa: S603
+        proc = subprocess.Popen(  # noqa: S603
             cmd,
             cwd=REPO_ROOT,
             stdout=stream,
             stderr=stream,
             start_new_session=True,
         )
-    return process.pid
+    return proc.pid
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Codex replacement for summarize_youtube command",
-    )
+    parser = argparse.ArgumentParser(description="Codex replacement for summarize_article command")
     parser.add_argument("--sync", action="store_true", help="run in foreground")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--lang", choices=["kr", "en"], help=argparse.SUPPRESS)
-    parser.add_argument("--input", dest="worker_input", help=argparse.SUPPRESS)
+    parser.add_argument("--url", dest="worker_url", help=argparse.SUPPRESS)
     parser.add_argument("--progress-file", help=argparse.SUPPRESS)
     parser.add_argument("arguments", nargs="*")
     return parser.parse_args()
@@ -381,13 +437,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-
     if args.worker:
-        if not args.worker_input or not args.lang or not args.progress_file:
+        if not args.lang or not args.worker_url or not args.progress_file:
             print("missing worker arguments", file=sys.stderr)
             return 1
-        progress_path = Path(args.progress_file)
-        return run_worker(SummaryInput(lang=args.lang, text=args.worker_input), progress_path)
+        return run_worker(SummaryInput(lang=args.lang, url=args.worker_url), Path(args.progress_file))
 
     try:
         user_input = parse_user_input(args.arguments)
@@ -395,10 +449,10 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    progress_file = create_progress_file(user_input.text)
+    progress_file = create_progress_file(user_input.url)
     payload = {
-        "url": user_input.text,
-        "type": "youtube",
+        "url": user_input.url,
+        "type": "article",
         "status": "processing",
         "started_at": now_iso(),
         "completed_at": None,
@@ -412,7 +466,7 @@ def main() -> int:
 
     pid = launch_background_worker(user_input, progress_file)
     print("Background job started")
-    print(f"- Input: {user_input.text}")
+    print(f"- Input: {user_input.url}")
     print(f"- Progress: {progress_file}")
     print(f"- Log: {progress_file.with_suffix('.log')}")
     print(f"- PID: {pid}")
