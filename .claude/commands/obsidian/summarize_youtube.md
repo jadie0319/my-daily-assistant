@@ -148,7 +148,7 @@ fi
     - id: 동영상 제목
     - aliases: 동영상 제목의 한국어 번역 (번역 필요한 경우)
     - author: 채널명 (소문자, 공백은 '-'로 변경)
-    - created_at: 현재 obsidian 파일 생성 시점
+    - created: 현재 obsidian 파일 생성 시점
     - source: 원본 YouTube URL
     - tool: claude
 3. **번역 및 요약**
@@ -208,7 +208,7 @@ tags:
   - frameworks/spring-boot/architecture
   - development/practices/clean-code
 author: coding-with-john
-created_at: 2025-09-15 16:30
+created: 2025-09-15 16:30
 related: []
 source: https://www.youtube.com/watch?v=lqQ_NL4y5Qg
 tool: claude
@@ -230,7 +230,7 @@ tags:
   - development/practices/object-oriented-design
   - architecture/patterns/gof-patterns
 author: ali-zeynalli
-created_at: 2025-09-04 11:39
+created: 2025-09-04 11:39
 related: []
 source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-used-in-java-core-libraries-bb8156ae279b
 tool: claude
@@ -240,7 +240,7 @@ tool: claude
 - **id**: YouTube 제목 (자동 추출) 또는 문서에서 발견한 제목
 - **aliases**: YouTube 제목의 한국어 번역 (번역 필요 시) 또는 문서 제목의 한국어 번역
 - **author**: YouTube 채널명 (자동 추출, 소문자, 공백은 '-'로 변경) 또는 문서 작성자
-- **created_at**: obsidian 파일 생성 시점 (자동 생성)
+- **created**: obsidian 파일 생성 시점 (자동 생성)
 - **source**: YouTube URL (자동 추출) 또는 문서 URL
 
 ## 문서 번역 및 요약 규칙
