@@ -68,14 +68,20 @@ description: |
 
 ### Phase 1: 초기화 (메인 에이전트 - 순차)
 
-1. **날짜 결정** - 인수가 없으면 어제 날짜 사용
+1. **env.config 읽기** - 경로 변수 로드
+```bash
+# Read 도구로 env.config 파일 읽기
+# OBSIDIAN_VAULT, DAILY_NOTE_DIR, INBOX_DIR, NOTES_DIR 변수 확인
+```
+
+2. **날짜 결정** - 인수가 없으면 어제 날짜 사용
 ```bash
 TARGET_DATE="${1:-$(date -v-1d +%Y-%m-%d)}"
 NEXT_DATE=$(date -j -f "%Y-%m-%d" -v+1d "$TARGET_DATE" +%Y-%m-%d)
 echo "대상 날짜: $TARGET_DATE"
 ```
 
-2. **Daily Note 경로 확인**
+3. **Daily Note 경로 확인**
 ```bash
 DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 ```
@@ -84,7 +90,7 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ### Phase 2: 서브 에이전트 병렬 실행 ★
 
-> **중요**: 아래 4개의 Task를 **단일 메시지에서 동시에 호출**하여 병렬 실행합니다.
+> **중요**: 아래 4개의 Task를 **단일 메시지에서 동시에 호출**하여 병렬 실행합니다. (프롬프트 내 TARGET_DATE, NEXT_DATE 치환 필수)
 > 각 서브 에이전트는 분석 결과를 **마크다운 형식의 텍스트**로 반환합니다.
 > 비용/속도 최적화를 위해 **haiku 모델**을 사용합니다.
 
@@ -200,7 +206,7 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ## 실행 단계
 1. Bash로 미팅 노트 파일 찾기:
-   ls $OBSIDIAN_VAULT/$DAILY_NOTE_DIR/{TARGET_DATE}-*.md 2>/dev/null
+   ls "$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/{TARGET_DATE}-"*.md 2>/dev/null
 
 2. 발견된 각 미팅 노트 파일 읽기 (Read 도구 사용)
 
@@ -280,7 +286,7 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ### Phase 3: 결과 통합 및 Daily Note 반영 (메인 에이전트)
 
-1. **5개 서브 에이전트 결과 수집**
+1. **4개 서브 에이전트 결과 수집**
    - 각 Task 도구의 반환값을 수집
 
 2. **Daily Note 확인**
@@ -300,8 +306,6 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 {SubAgent 3 결과 - 미팅}
 
-{SubAgent 5 결과 - Things 활동}
-
 {SubAgent 4 결과 - 학습 기록}
 ```
 
@@ -314,7 +318,7 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ## 병렬 실행 핵심 원칙
 
-1. **단일 응답에서 4개 Task 동시 호출**: 메인 에이전트는 Phase 2에서 하나의 응답에 4개의 Task 도구 호출을 포함해야 합니다.
+1. **단일 응답에서 4개 Task 동시 호출**: 메인 에이전트는 Phase 2에서 하나의 응답에 SubAgent 1~4를 동시에 호출해야 합니다.
 
 2. **haiku 모델 사용**: 비용과 속도 최적화를 위해 서브 에이전트는 haiku 모델을 사용합니다.
 

@@ -28,9 +28,11 @@ description: |
 
 ## 실행 단계
 
-### Step 1: 이번 주 시작일 계산
+### Step 1: env.config 읽기 및 주차 계산
 
 ```bash
+# Read 도구로 env.config 읽기 (OBSIDIAN_VAULT 변수 확인)
+
 # 이번 주 월요일 구하기
 WEEK_START=$(date -v-$(($(date +%u) - 1))d +%Y-%m-%d)
 WEEK_NUM=$(date +%Y-W%V)
@@ -41,9 +43,10 @@ echo "주차: $WEEK_NUM"
 ### Step 2: 이번 주 세션 로그 수집
 
 ```bash
-# 이번 주 수정된 세션 로그 찾기
-WEEK_START=$(date -v-$(($(date +%u) - 1))d +%Y-%m-%d)
-find ~/.claude/projects -name "*.jsonl" -newermt "$WEEK_START"
+# macOS 호환 방식 (stat + grep)
+find ~/.claude/projects -name "*.jsonl" -type f \
+  -exec stat -f "%Sm %N" -t "%Y-%m-%d" {} \; 2>/dev/null | \
+  awk -v start="$WEEK_START" '$1 >= start {print $2}'
 ```
 
 ### Step 3: 세션 로그 파싱
@@ -178,8 +181,11 @@ date -v-$(($(date +%u) - 1))d +%Y-%m-%d
 # 이번 주차
 date +%Y-W%V
 
-# 이번 주 세션 로그 수
-find ~/.claude/projects -name "*.jsonl" -newermt "$(date -v-$(($(date +%u) - 1))d +%Y-%m-%d)" | wc -l
+# 이번 주 세션 로그 수 (macOS 호환)
+WEEK_START=$(date -v-$(($(date +%u) - 1))d +%Y-%m-%d)
+find ~/.claude/projects -name "*.jsonl" -type f \
+  -exec stat -f "%Sm %N" -t "%Y-%m-%d" {} \; 2>/dev/null | \
+  awk -v start="$WEEK_START" '$1 >= start {print $2}' | wc -l
 
 # 출력 디렉토리 생성
 mkdir -p $OBSIDIAN_VAULT/analytics/claude-weekly
@@ -191,8 +197,8 @@ mkdir -p $OBSIDIAN_VAULT/analytics/claude-weekly
 금요일 오후 실행 시:
 ├── 분석 기간: 월요일 ~ 금요일
 ├── 세션 로그 수집:
-│   ├── ~/.claude/projects/-Users-msbaek-projectA/*.jsonl
-│   └── ~/.claude/projects/-Users-msbaek-projectB/*.jsonl
+│   ├── ~/.claude/projects/-Users-[username]-projectA/*.jsonl
+│   └── ~/.claude/projects/-Users-[username]-projectB/*.jsonl
 ├── 파싱 및 집계:
 │   ├── 총 세션 15개
 │   ├── 총 시간 8h 30m

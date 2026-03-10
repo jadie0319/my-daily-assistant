@@ -29,9 +29,8 @@ Claude Code 세션 로그에서 **새로운 기술, 라이브러리, 개념**에
 | 항목 | 경로 |
 |------|------|
 | Claude 세션 | `~/.claude/projects/` |
-| history.jsonl | `~/.claude/history.jsonl` |
-| transcripts | `~/.claude/transcripts/` |
-| TIL 출력 | `$OBSIDIAN_VAULT/$DAILY_NOTE_DIR` (Daily Note 내) |
+| TIL 출력 (독립 실행) | `$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/{TARGET_DATE}.md` (Daily Note에 append) |
+| TIL 출력 (daily-work-logger 연동) | Daily Note의 "학습 기록" 섹션 |
 
 ## 학습 감지 패턴
 
@@ -85,9 +84,10 @@ echo "대상 날짜: $TARGET_DATE"
 ### Step 2: 해당 날짜 세션 로그 찾기
 
 ```bash
-find ~/.claude/projects -name "*.jsonl" \
-  -newermt "$TARGET_DATE 00:00:00" \
-  ! -newermt "$NEXT_DATE 00:00:00" 2>/dev/null
+# macOS 호환 방식 (stat + grep)
+find ~/.claude/projects -name "*.jsonl" -type f \
+  -exec stat -f "%Sm %N" -t "%Y-%m-%d" {} \; 2>/dev/null | \
+  grep "^$TARGET_DATE" | awk '{print $2}'
 ```
 
 ### Step 3: 세션 로그에서 학습 내용 추출

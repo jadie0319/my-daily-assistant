@@ -50,6 +50,14 @@ CLAUDE.md에 포함되어 있던 Obsidian vault 작업 가이드(경로, 태그 
 - 형식: `#category/subcategory/detail`
 - 5가지 카테고리: Topic, Document Type, Source, Status, Project
 
+| 카테고리 | 예시 태그 |
+|---------|---------|
+| Topic | `#topic/engineering`, `#topic/leadership`, `#topic/ai` |
+| Document Type | `#type/til`, `#type/meeting`, `#type/article`, `#type/newsletter` |
+| Source | `#source/youtube`, `#source/book`, `#source/blog` |
+| Status | `#status/draft`, `#status/done`, `#status/archived` |
+| Project | `#project/active`, `#project/paused` |
+
 ### 3. Zettelkasten 폴더 구조
 
 | 폴더          | 용도   | 작업 권한 |
@@ -90,7 +98,13 @@ CLAUDE.md에 포함되어 있던 Obsidian vault 작업 가이드(경로, 태그 
 | ------------------ | ---------------------------- |
 | markdown-oxide LSP | 백링크, 태그, 링크 검색 및 진단          |
 | ripgrep            | 단순 텍스트 매칭 폴백                 |
-| `$OBSIDIAN_VAULT`  | 글로벌 CLAUDE.md에서 정의된 vault 경로 |
+| `$OBSIDIAN_VAULT`  | env.config에서 정의된 vault 루트 경로 |
+| `$DAILY_NOTE_DIR`  | env.config에서 정의된 daily notes 디렉토리 |
+| `$INBOX_DIR`       | env.config에서 정의된 수집함 경로      |
+| `$NOTES_DIR`       | env.config에서 정의된 참고자료 경로     |
+
+> **주의**: markdown-oxide LSP가 설정되어 있지 않으면 LSP 기능이 동작하지 않습니다.
+> 설치 확인: Claude Code에서 LSP 도구 사용 시 오류가 없는지 확인하세요.
 
 ## 참고
 
