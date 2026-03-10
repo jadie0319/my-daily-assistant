@@ -141,7 +141,7 @@ def build_prompt(
     transcript_file: Path,
     title: str,
     author: str,
-    created_at: str,
+    created: str,
     source: str,
 ) -> str:
     output_language = "Korean" if lang == "kr" else "English"
@@ -162,7 +162,7 @@ Output constraints:
   2) aliases
   3) tags
   4) author
-  5) created_at
+  5) created
   6) related
   7) source
   8) tool
@@ -183,7 +183,7 @@ Required body structure:
 Use this metadata exactly:
 - id: {title}
 - author: {author}
-- created_at: {created_at}
+- created: {created}
 - source: {source}
 - tool: codex
 
@@ -194,7 +194,7 @@ aliases: <translated title when useful, otherwise same as id>
 tags:
   - <tag-1>
 author: {yaml_quote(author)}
-created_at: {yaml_quote(created_at)}
+created: {yaml_quote(created)}
 related: []
 source: {yaml_quote(source)}
 tool: "codex"
@@ -291,7 +291,7 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
             source = "manual-input"
             transcript = user_input.text
 
-        created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+        created = datetime.now().strftime("%Y-%m-%d %H:%M")
         output_path, output_rel = resolve_output_path(title, env_values)
 
         with tempfile.TemporaryDirectory(
@@ -307,7 +307,7 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                 transcript_file=transcript_file,
                 title=title,
                 author=author,
-                created_at=created_at,
+                created=created,
                 source=source,
             )
             run_codex_summary(prompt, summary_file)

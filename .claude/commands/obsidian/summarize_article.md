@@ -151,7 +151,7 @@ tags:
   - architecture/patterns/gof-patterns
 author: ali-zeynalli
 tool: claude
-created_at: 2025-09-04 11:39
+created: 2025-09-04 11:39
 related: []
 source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-used-in-java-core-libraries-bb8156ae279b
 ```
@@ -159,7 +159,7 @@ source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-u
 - id: 문서에서 발견한 제목 (WebFetch에서 추출한 title 사용). **콜론(`:`)이 포함된 경우 반드시 따옴표로 감쌀 것** (예: `id: "제목: 부제목"`)
 - aliases: 문서에서 발견한 제목의 한국어 번역
 - author: 문서에서 발견한 작성자 (WebFetch에서 추출한 author 사용). 이름은 다 소문자, 공백은 '-'로 변경
-- created_at: obsidian 파일 생성 시점
+- created: obsidian 파일 생성 시점
 - source: 문서 url
 
 ## 문서 번역 및 요약 규칙
