@@ -1,3 +1,5 @@
+참고 : https://github.com/msbaek/dotfiles
+
 # My Daily Assistant
 
 개인 일상 업무를 자동화하는 스크립트 모음. URL 요약, YouTube 정리, 노트 태깅 등 반복적인 작업을 줄이고 결과를 Obsidian 볼트에 저장합니다.

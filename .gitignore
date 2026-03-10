@@ -1,3 +1,4 @@
 env.config
 .claude/article-progress
 .codex/article-progress
+.nvimlog
