@@ -24,16 +24,16 @@ description: |
 │  - 결과 수집 및 Daily Note 반영 (Phase 3)                      │
 └─────────────────────────────────────────────────────────────┘
                               │
-   ┌───────────┬───────┬──────┼──────┐
-   │           │       │      │      │ 
-   ▼           ▼       ▼      ▼      ▼ 
-┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
-│ Sub 1  │ │ Sub 2  │ │ Sub 3  │ │ Sub 4  │
-│ Vault  │ │ CC     │ │ Meetng │ │ Learn  │
-│ Files  │ │ Sessns │ │ Notes  │ │ Extrcr │
-└────────┘ └────────┘ └────────┘ └────────┘
-   │           │       │      │      │
-   └───────────┴───────┴──────┼──────┘
+   ┌──────────┬───────┬───────┼──────┬──────┐
+   │          │       │       │      │      │
+   ▼          ▼       ▼       ▼      ▼      ▼
+┌───────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+│ Sub 1 │ │Sub 2 │ │Sub 3 │ │Sub 4 │ │Sub 5 │
+│ Vault │ │ CC   │ │Meetng│ │Learn │ │Codex │
+│ Files │ │Sessns│ │Notes │ │Extrcr│ │Sessns│
+└───────┘ └──────┘ └──────┘ └──────┘ └──────┘
+   │          │       │       │      │      │
+   └──────────┴───────┴───────┼──────┴──────┘
                               ▼
                    ┌─────────────────┐
                    │ Daily Note 반영  │
@@ -60,6 +60,8 @@ description: |
 | 미팅 노트     | `$DAILY_NOTE_DIR/YYYY-MM-DD-*.md`  |
 | 기술 문서     | `$INBOX_DIR`, `$NOTES_DIR`         |
 | Claude 세션 | `~/.claude/projects/`  |
+| Codex 세션  | `~/.codex/sessions/YYYY/MM/DD/` |
+| Codex 히스토리 | `~/.codex/history.jsonl` |
 
 ---
 
@@ -90,7 +92,7 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ### Phase 2: 서브 에이전트 병렬 실행 ★
 
-> **중요**: 아래 4개의 Task를 **단일 메시지에서 동시에 호출**하여 병렬 실행합니다. (프롬프트 내 TARGET_DATE, NEXT_DATE 치환 필수)
+> **중요**: 아래 5개의 Task를 **단일 메시지에서 동시에 호출**하여 병렬 실행합니다. (프롬프트 내 TARGET_DATE, NEXT_DATE 치환 필수)
 > 각 서브 에이전트는 분석 결과를 **마크다운 형식의 텍스트**로 반환합니다.
 > 비용/속도 최적화를 위해 **haiku 모델**을 사용합니다.
 
@@ -284,9 +286,55 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ---
 
+#### SubAgent 5: Codex Sessions Analyzer
+
+**Task 호출 파라미터:**
+| 파라미터 | 값 |
+|---------|-----|
+| description | "Codex 세션 분석" |
+| subagent_type | "general-purpose" |
+| model | "haiku" |
+
+**프롬프트 (TARGET_DATE 치환 필요):**
+
+```
+당신은 Codex 세션 로그 분석 전문가입니다. 코드를 작성하지 말고 분석만 수행하세요.
+
+## 작업
+{TARGET_DATE} 날짜의 Codex 세션 로그를 분석하여 수행한 작업을 추출합니다.
+
+## 경로
+- Codex 세션: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+- Codex 히스토리: ~/.codex/history.jsonl
+
+## 실행 단계
+1. Bash로 해당 날짜 세션 파일 찾기:
+   ls ~/.codex/sessions/{YYYY}/{MM}/{DD}/*.jsonl 2>/dev/null
+   (날짜에서 YYYY, MM, DD 각각 추출하여 경로 구성)
+
+2. history.jsonl에서 해당 날짜의 사용자 입력 추출:
+   cat ~/.codex/history.jsonl | jq -r 'select(.ts != null) | select((.ts | todate | startswith("{TARGET_DATE}"))) | .text' 2>/dev/null | head -30
+
+3. rollout jsonl 파일에서 세부 작업 내용 추출 (Bash로 일부만 읽기):
+   head -100 [파일] | jq -r 'select(.type == "session_meta") | .payload | "프로젝트: \(.cwd), 모델: \(.model_provider)"' 2>/dev/null
+   head -200 [파일] | jq -r 'select(.type == "message" and .payload.role == "user") | .payload.content | if type=="array" then .[0].text // "" else . end' 2>/dev/null | head -20
+
+4. 프로젝트명 추출: cwd에서 마지막 디렉토리명 사용
+
+## 출력 형식 (마크다운으로 반환)
+### Codex 작업
+- **[프로젝트명]**: 수행 작업 요약
+  - 세부 작업 1
+  - 세부 작업 2
+
+(세션이 없으면 "해당 날짜에 Codex 세션 없음" 반환)
+```
+
+---
+
 ### Phase 3: 결과 통합 및 Daily Note 반영 (메인 에이전트)
 
-1. **4개 서브 에이전트 결과 수집**
+1. **5개 서브 에이전트 결과 수집**
    - 각 Task 도구의 반환값을 수집
 
 2. **Daily Note 확인**
@@ -304,6 +352,8 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 {SubAgent 2 결과 - Claude Code 작업}
 
+{SubAgent 5 결과 - Codex 작업}
+
 {SubAgent 3 결과 - 미팅}
 
 {SubAgent 4 결과 - 학습 기록}
@@ -318,7 +368,7 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 
 ## 병렬 실행 핵심 원칙
 
-1. **단일 응답에서 4개 Task 동시 호출**: 메인 에이전트는 Phase 2에서 하나의 응답에 SubAgent 1~4를 동시에 호출해야 합니다.
+1. **단일 응답에서 5개 Task 동시 호출**: 메인 에이전트는 Phase 2에서 하나의 응답에 SubAgent 1~5를 동시에 호출해야 합니다.
 
 2. **haiku 모델 사용**: 비용과 속도 최적화를 위해 서브 에이전트는 haiku 모델을 사용합니다.
 
