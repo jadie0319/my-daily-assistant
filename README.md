@@ -105,6 +105,33 @@ YouTube 영상의 자막을 추출·번역하여 Obsidian 노트로 저장합니
 
 ---
 
+#### Daily Work Logger
+
+특정 날짜의 작업 내역을 정리해서 Daily Note를 업데이트하고, 해당 날짜의 `Tomorrow` 항목을 다음 날짜 `Today`로 이월합니다.
+
+**Codex:**
+Codex 대화에서 skill 이름으로 실행합니다.
+
+```text
+daily-work-logger
+daily-work-logger 2026-03-12
+```
+
+- `daily-work-logger`
+  - 인수가 없으면 어제 날짜를 `TARGET_DATE`로 사용합니다.
+- `daily-work-logger 2026-03-12`
+  - `TARGET_DATE`를 `2026-03-12`, `NEXT_DATE`를 `2026-03-13`으로 계산합니다.
+
+동작 결과:
+- `{OBSIDIAN_VAULT}{DAILY_NOTE_DIR}/{TARGET_DATE}.md` 에 작업 요약을 반영합니다.
+- `{TARGET_DATE}` Daily Note의 `## Company TODO > ### Tomorrow`, `## Private TODO > ### Tomorrow` 항목을 읽어
+  `{NEXT_DATE}` Daily Note의 `### Today` 섹션으로 옮깁니다.
+
+주의:
+- 이 skill은 Codex에서 독립적으로 동작하며 `.claude` 의 skill이나 세션 로그를 참조하지 않습니다.
+
+---
+
 ## 기여 / 확장
 
 새 기능(스크립트)을 추가할 때:

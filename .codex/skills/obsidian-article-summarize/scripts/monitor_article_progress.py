@@ -33,18 +33,19 @@ def load_records(limit: int) -> list[dict[str, object]]:
 
 def format_record(payload: dict[str, object]) -> str:
     status = str(payload.get("status", "unknown"))
-    source = str(payload.get("url", ""))
+    source = str(payload.get("url") or payload.get("text_preview") or payload.get("input") or "")
     output_file = payload.get("output_file")
     error = payload.get("error")
     path = str(payload.get("_path", ""))
+    mode = str(payload.get("mode", "url"))
 
     if status == "processing":
-        return f"[processing] {source}\n  progress: {path}"
+        return f"[processing:{mode}] {source}\n  progress: {path}"
     if status == "completed":
-        return f"[completed] {source}\n  output: {output_file}\n  progress: {path}"
+        return f"[completed:{mode}] {source}\n  output: {output_file}\n  progress: {path}"
     if status == "failed":
-        return f"[failed] {source}\n  error: {error}\n  progress: {path}"
-    return f"[{status}] {source}\n  progress: {path}"
+        return f"[failed:{mode}] {source}\n  error: {error}\n  progress: {path}"
+    return f"[{status}:{mode}] {source}\n  progress: {path}"
 
 
 def main() -> int:

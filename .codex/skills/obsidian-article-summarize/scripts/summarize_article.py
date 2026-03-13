@@ -24,7 +24,8 @@ DEFAULT_ATTACHMENT_DIR = "/99.Attachments"
 @dataclass
 class SummaryInput:
     lang: str
-    url: str
+    mode: str
+    value: str
 
 
 def now_iso() -> str:
@@ -46,23 +47,25 @@ def load_env_config(path: Path) -> dict[str, str]:
 
 def parse_user_input(arguments: list[str]) -> SummaryInput:
     if not arguments:
-        raise ValueError("Usage: summarize_article.py [--sync] [kr|en] <article_url>")
+        raise ValueError("Usage: summarize_article.py [--sync] [kr|en] <article_url|article_text>")
 
     first = arguments[0].lower()
     if first in {"kr", "ko", "en"}:
         lang = "kr" if first in {"kr", "ko"} else "en"
-        url = " ".join(arguments[1:]).strip()
+        value = " ".join(arguments[1:]).strip()
     else:
         lang = "kr"
-        url = " ".join(arguments).strip()
+        value = " ".join(arguments).strip()
 
-    if not url:
-        raise ValueError("Article URL is empty")
+    if not value:
+        raise ValueError("Article input is empty")
 
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("Article URL must start with http:// or https://")
-    return SummaryInput(lang=lang, url=url)
+    parsed = urlparse(value)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        mode = "url"
+    else:
+        mode = "text"
+    return SummaryInput(lang=lang, mode=mode, value=value)
 
 
 def slugify(value: str, fallback: str = "article") -> str:
@@ -78,9 +81,9 @@ def clean_filename(value: str) -> str:
 
 def normalize_author(author: str | None) -> str:
     if not author:
-        return "unknown"
+        return ""
     text = re.sub(r"\s+", " ", author).strip()
-    return text or "unknown"
+    return text
 
 
 def yaml_quote(value: str) -> str:
@@ -93,11 +96,14 @@ def write_progress(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def create_progress_file(url: str) -> Path:
-    parsed = urlparse(url)
-    key = slugify(f"{parsed.netloc}-{parsed.path}", fallback="article")[:48]
+def create_progress_file(user_input: SummaryInput) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return PROGRESS_DIR / f"{timestamp}-article-{key}.json"
+    if user_input.mode == "url":
+        parsed = urlparse(user_input.value)
+        key = slugify(f"{parsed.netloc}-{parsed.path}", fallback="article")[:48]
+        return PROGRESS_DIR / f"{timestamp}-article-{key}.json"
+    key = slugify(user_input.value[:30], fallback="text")[:48]
+    return PROGRESS_DIR / f"{timestamp}-article-text-{key}.json"
 
 
 def run_article_extractor(url: str) -> dict[str, object]:
@@ -119,6 +125,32 @@ def run_article_extractor(url: str) -> dict[str, object]:
     if not payload.get("content"):
         raise RuntimeError("article content is empty")
     return payload
+
+
+def warn_if_short_text(user_input: SummaryInput) -> None:
+    if user_input.mode == "text" and len(user_input.value) < 200:
+        print(
+            "Warning: input text is shorter than 200 characters. "
+            "If you meant to pass a URL, it must start with http:// or https://",
+            file=sys.stderr,
+        )
+
+
+def derive_text_title(text: str) -> str:
+    heading_match = re.search(r"(?m)^\s*#\s+(.+?)\s*$", text)
+    if heading_match:
+        return clean_filename(heading_match.group(1).strip())
+
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return "Untitled Article"
+
+    sentence_match = re.search(r"(.+?[.!?])(?:\s|$)", normalized)
+    if sentence_match:
+        candidate = sentence_match.group(1).strip()
+    else:
+        candidate = normalized[:80].strip()
+    return clean_filename(candidate[:80])
 
 
 def build_prompt(
@@ -175,7 +207,7 @@ Use this metadata exactly:
 - id: {title}
 - author: {author}
 - created: {created}
-- source: {source}
+- source: {source or "<empty>"}
 - tool: codex
 
 Frontmatter template:
@@ -340,18 +372,28 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
     progress_payload = json.loads(progress_file.read_text(encoding="utf-8"))
     try:
         env_values = load_env_config(REPO_ROOT / "env.config")
-        article_data = run_article_extractor(user_input.url)
-
-        title = str(article_data.get("title") or f"Article {urlparse(user_input.url).netloc}").strip()
-        author = normalize_author(str(article_data.get("author") or ""))
-        content = str(article_data.get("content") or "")
-        images = article_data.get("images") or []
-        if not isinstance(images, list):
+        if user_input.mode == "url":
+            article_data = run_article_extractor(user_input.value)
+            title = str(article_data.get("title") or f"Article {urlparse(user_input.value).netloc}").strip()
+            author = normalize_author(str(article_data.get("author") or ""))
+            source = user_input.value
+            content = str(article_data.get("content") or "")
+            images = article_data.get("images") or []
+            if not isinstance(images, list):
+                images = []
+        else:
+            title = derive_text_title(user_input.value)
+            author = ""
+            source = ""
+            content = user_input.value
             images = []
 
         created = datetime.now().strftime("%Y-%m-%d %H:%M")
         output_path, output_rel = resolve_output_path(title, env_values)
-        attachment_abs_dir, attachment_rel_dir = resolve_attachment_dir(env_values)
+        attachment_abs_dir: Path | None = None
+        attachment_rel_dir = ""
+        if user_input.mode == "url":
+            attachment_abs_dir, attachment_rel_dir = resolve_attachment_dir(env_values)
 
         with tempfile.TemporaryDirectory(prefix="codex-article-", dir=PROGRESS_DIR) as tmp_dir:
             tmp_root = Path(tmp_dir)
@@ -365,7 +407,7 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                 title=title,
                 author=author,
                 created=created,
-                source=user_input.url,
+                source=source,
             )
             run_codex_summary(prompt, summary_file)
 
@@ -376,12 +418,13 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                     "id": yaml_quote(title),
                     "author": yaml_quote(author),
                     "tool": "codex",
-                    "source": yaml_quote(user_input.url),
+                    "source": yaml_quote(source),
                 },
             )
 
-            image_embeds, image_failures = download_images(images, attachment_abs_dir, attachment_rel_dir)
-            summary = append_image_section(summary, image_embeds, image_failures)
+            if user_input.mode == "url" and attachment_abs_dir is not None:
+                image_embeds, image_failures = download_images(images, attachment_abs_dir, attachment_rel_dir)
+                summary = append_image_section(summary, image_embeds, image_failures)
 
         output_path.write_text(summary.rstrip() + "\n", encoding="utf-8")
 
@@ -408,8 +451,10 @@ def launch_background_worker(user_input: SummaryInput, progress_file: Path) -> i
         "--worker",
         "--lang",
         user_input.lang,
-        "--url",
-        user_input.url,
+        "--mode",
+        user_input.mode,
+        "--input",
+        user_input.value,
         "--progress-file",
         str(progress_file),
     ]
@@ -429,7 +474,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sync", action="store_true", help="run in foreground")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--lang", choices=["kr", "en"], help=argparse.SUPPRESS)
-    parser.add_argument("--url", dest="worker_url", help=argparse.SUPPRESS)
+    parser.add_argument("--mode", choices=["url", "text"], help=argparse.SUPPRESS)
+    parser.add_argument("--input", dest="worker_input", help=argparse.SUPPRESS)
     parser.add_argument("--progress-file", help=argparse.SUPPRESS)
     parser.add_argument("arguments", nargs="*")
     return parser.parse_args()
@@ -438,10 +484,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if args.worker:
-        if not args.lang or not args.worker_url or not args.progress_file:
+        if not args.lang or not args.mode or not args.worker_input or not args.progress_file:
             print("missing worker arguments", file=sys.stderr)
             return 1
-        return run_worker(SummaryInput(lang=args.lang, url=args.worker_url), Path(args.progress_file))
+        return run_worker(
+            SummaryInput(lang=args.lang, mode=args.mode, value=args.worker_input),
+            Path(args.progress_file),
+        )
 
     try:
         user_input = parse_user_input(args.arguments)
@@ -449,16 +498,23 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    progress_file = create_progress_file(user_input.url)
-    payload = {
-        "url": user_input.url,
+    warn_if_short_text(user_input)
+
+    progress_file = create_progress_file(user_input)
+    payload: dict[str, object] = {
         "type": "article",
+        "mode": user_input.mode,
         "status": "processing",
         "started_at": now_iso(),
         "completed_at": None,
         "output_file": None,
         "error": None,
     }
+    if user_input.mode == "url":
+        payload["url"] = user_input.value
+    else:
+        payload["input"] = "text"
+        payload["text_preview"] = user_input.value[:80]
     write_progress(progress_file, payload)
 
     if args.sync:
@@ -466,7 +522,10 @@ def main() -> int:
 
     pid = launch_background_worker(user_input, progress_file)
     print("Background job started")
-    print(f"- Input: {user_input.url}")
+    if user_input.mode == "url":
+        print(f"- URL: {user_input.value}")
+    else:
+        print(f"- Input: text ({len(user_input.value)} chars)")
     print(f"- Progress: {progress_file}")
     print(f"- Log: {progress_file.with_suffix('.log')}")
     print(f"- PID: {pid}")
