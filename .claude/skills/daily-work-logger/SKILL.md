@@ -364,6 +364,30 @@ DAILY_NOTE="$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/${TARGET_DATE}.md"
 {TARGET_DATE} 작업 내역이 Daily Note에 반영되었습니다.
 ```
 
+5. **Tomorrow → NEXT_DATE Today 이전**
+
+   a. **TARGET_DATE Daily Note에서 Tomorrow 항목 추출**
+      - Read 도구로 TARGET_DATE Daily Note 읽기
+      - `## Company TODO` > `### Tomorrow` 항목 추출 (체크박스 라인: `- [ ]` 또는 `- [x]`)
+      - `## Private TODO` > `### Tomorrow` 항목 추출 (동일 방식)
+      - 두 섹션 모두 항목이 없으면 이 단계 종료 (NEXT_DATE 파일 건드리지 않음)
+
+   b. **항목이 있으면 NEXT_DATE Daily Note 확인 및 수정**
+      - Read 도구로 NEXT_DATE Daily Note 읽기
+      - 파일이 없으면 기본 템플릿으로 생성 후 진행
+      - Company TODO 항목: NEXT_DATE의 `## Company TODO` > `### Today` 섹션에 추가
+      - Private TODO 항목: NEXT_DATE의 `## Private TODO` > `### Today` 섹션에 추가
+      - 중복 체크: 이미 동일한 텍스트(체크박스 상태 무관하게 텍스트 내용 비교)가 있으면 해당 항목 스킵
+      - 중복이 아닌 항목을 `### Today` 섹션의 기존 항목 아래에 추가 (기존 항목 보존)
+      - Edit 도구로 NEXT_DATE Daily Note 수정
+
+   c. **완료 메시지 출력**
+      ```
+      {TARGET_DATE} Tomorrow 항목 N개를 {NEXT_DATE} Today에 추가했습니다.
+      (Company: N개, Private: N개)
+      ```
+      (추가된 항목이 없으면 메시지 생략)
+
 ---
 
 ## 병렬 실행 핵심 원칙
