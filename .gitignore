@@ -2,3 +2,5 @@ env.config
 .claude/article-progress
 .codex/article-progress
 .nvimlog
+.DS_Store
+
