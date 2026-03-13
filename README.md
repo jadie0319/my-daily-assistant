@@ -37,6 +37,7 @@
 my-daily-assistant/
 ├── .claude/
 │   ├── commands/obsidian/      # Claude Code 슬래시 커맨드
+│   ├── skills/                 # Claude Code 자동 적용 스킬
 │   └── article-progress/       # Claude Code 작업 진행 상태
 ├── .codex/
 │   ├── bin/                    # Codex 실행 래퍼
@@ -105,9 +106,50 @@ YouTube 영상의 자막을 추출·번역하여 Obsidian 노트로 저장합니
 
 ---
 
+#### 기술 문서 요약 (Article Summarize)
+
+기술 문서 URL 또는 텍스트를 번역/정리하여 Obsidian 노트로 저장합니다.
+
+**Claude Code:**
+```
+/obsidian:summarize_article https://example.com/post
+/obsidian:summarize_article # 제목\n\n본문 텍스트...
+```
+
+- URL(`http://`, `https://`로 시작)과 **텍스트 직접 입력** 두 가지 모드 지원
+- 텍스트 모드: 200자 미만이면 경고 출력 후 계속 처리
+- 직접 호출 시 백그라운드 실행, subagent 내부 호출 시 동기 실행
+
+**Codex:**
+```bash
+./.codex/bin/summarize-article kr "https://example.com/post"
+./.codex/bin/summarize-article kr "# 제목\n\n본문..."
+./.codex/bin/article-progress   # 진행 상태 확인
+```
+
+출력 위치: `{OBSIDIAN_VAULT}/{ARTICLE_DIR}/`
+
+---
+
 #### Daily Work Logger
 
 특정 날짜의 작업 내역을 정리해서 Daily Note를 업데이트하고, 해당 날짜의 `Tomorrow` 항목을 다음 날짜 `Today`로 이월합니다.
+
+**Claude Code:**
+
+`daily-work-logger` skill이 자동 적용됩니다. 대화에서 자연어로 요청합니다.
+
+```text
+어제 작업 정리해줘
+daily-work-logger 2026-03-12
+```
+
+서브 에이전트 기반 병렬 처리(5개 동시 실행):
+- **SubAgent 1**: Vault 파일 분석 (수정된 .md 파일 추출)
+- **SubAgent 2**: Claude 세션 분석 (`~/.claude/projects/`)
+- **SubAgent 3**: 미팅 노트 분석
+- **SubAgent 4**: 학습 내용 추출 (TIL)
+- **SubAgent 5**: Codex 세션 분석 (`~/.codex/sessions/`)
 
 **Codex:**
 Codex 대화에서 skill 이름으로 실행합니다.
@@ -117,18 +159,37 @@ daily-work-logger
 daily-work-logger 2026-03-12
 ```
 
-- `daily-work-logger`
-  - 인수가 없으면 어제 날짜를 `TARGET_DATE`로 사용합니다.
-- `daily-work-logger 2026-03-12`
-  - `TARGET_DATE`를 `2026-03-12`, `NEXT_DATE`를 `2026-03-13`으로 계산합니다.
+공통 동작:
+- 인수가 없으면 어제 날짜를 `TARGET_DATE`로 사용합니다.
+- `{TARGET_DATE}.md` Daily Note에 작업 요약을 반영합니다.
+- `## Company TODO > ### Tomorrow`, `## Private TODO > ### Tomorrow` 항목을 `{NEXT_DATE}` Daily Note의 `### Today`로 이월합니다.
 
-동작 결과:
-- `{OBSIDIAN_VAULT}{DAILY_NOTE_DIR}/{TARGET_DATE}.md` 에 작업 요약을 반영합니다.
-- `{TARGET_DATE}` Daily Note의 `## Company TODO > ### Tomorrow`, `## Private TODO > ### Tomorrow` 항목을 읽어
-  `{NEXT_DATE}` Daily Note의 `### Today` 섹션으로 옮깁니다.
+---
 
-주의:
-- 이 skill은 Codex에서 독립적으로 동작하며 `.claude` 의 skill이나 세션 로그를 참조하지 않습니다.
+## Claude Code Skills (`.claude/skills/`)
+
+대화 중 자동으로 트리거되는 skill 모음입니다. 별도 명령 없이 자연어 요청으로 실행됩니다.
+
+| Skill | 트리거 키워드 | 설명 |
+|-------|------------|------|
+| `daily-work-logger` | "어제 작업 정리해줘", "daily log", "업무 내역 정리" | 어제 작업 내역을 5개 서브 에이전트로 병렬 분석하여 Daily Note 반영 |
+| `learning-tracker` | "학습 정리", "TIL", "오늘 배운 것", "learning" | 세션에서 새 기술/개념 학습 내용을 추출하여 TIL 문서 생성 |
+| `weekly-claude-analytics` | "주간 분석", "Claude 사용 통계", "weekly analytics" | 주간 Claude Code 세션 로그를 분석하여 프로젝트별 시간 분포 리포트 생성 |
+| `weekly-newsletter` | "뉴스레터 만들어줘", "이번 주 글 정리해줘", "weekly digest" | 이번 주(토~금) Vault 글들을 모아 외부 공유용 뉴스레터 생성 |
+| `obsidian-vault` | Obsidian vault 관련 작업 | LSP 기반 효율적인 검색, 백링크 탐색, 태그 관리 |
+
+### Skill 연계 구조
+
+```
+daily-work-logger
+  └── SubAgent 4 (Learning Extractor) → learning-tracker 로직 활용
+
+weekly-claude-analytics
+  └── Claude 세션 로그 분석 → 프로젝트별 통계
+
+weekly-newsletter
+  └── Vault 파일 분석 → 외부 공유 뉴스레터
+```
 
 ---
 
@@ -137,6 +198,7 @@ daily-work-logger 2026-03-12
 새 기능(스크립트)을 추가할 때:
 
 - Claude Code용 커맨드 → `.claude/commands/<category>/`
+- Claude Code용 skill → `.claude/skills/<skill-name>/SKILL.md`
 - Codex용 스크립트 → `.codex/skills/<skill-name>/scripts/`
 - 공통 설정 변경 → 루트 파일(`env.config` 등)
 - 실행 가이드 → `my-daily-service-commands.md`에 섹션 추가
