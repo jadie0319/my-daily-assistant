@@ -17,7 +17,7 @@ description:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Main Agent (Orchestrator)                 │
-│  - 날짜 범위 계산 (Phase 1)                                    │
+│  - 날짜 범위 계산 + 파일 목록 선계산 (Phase 1)                   │
 │  - 서브 에이전트 병렬 실행 (Phase 2)                            │
 │  - 결과 통합 및 뉴스레터 작성 (Phase 3)                         │
 └─────────────────────────────────────────────────────────────┘
@@ -63,7 +63,7 @@ description:
 
 - **실행**: 매주 토요일 오전 (또는 필요 시)
 - **대상 기간**: 해당 주 토요일 ~ 금요일 (7일간)
-- **출력**: `newsletters/YYYY-WXX-newsletter.md`
+- **출력**: `$NEWSLETTER_DIR/YYYY-WXX-newsletter.md`
 
 ## 경로 정보
 
@@ -71,7 +71,7 @@ description:
 | ----------- | ---------------------------------- |
 | vault       | `$OBSIDIAN_VAULT/`                 |
 | dailies     | `$OBSIDIAN_VAULT/$DAILY_NOTE_DIR/` |
-| newsletters | `$OBSIDIAN_VAULT/newsletters/`     |
+| newsletters | `$OBSIDIAN_VAULT/$NEWSLETTER_DIR/` |
 
 ## 입력 소스
 
@@ -89,7 +89,7 @@ description:
 1. **env.config 읽기** - 경로 변수 로드
 ```bash
 # Read 도구로 env.config 파일 읽기
-# OBSIDIAN_VAULT, DAILY_NOTE_DIR, INBOX_DIR, NOTES_DIR 변수 확인
+# OBSIDIAN_VAULT, DAILY_NOTE_DIR, INBOX_DIR, NOTES_DIR, NEWSLETTER_DIR 변수 확인
 ```
 
 2. **주차 결정 및 날짜 범위 계산**
@@ -124,9 +124,28 @@ echo "대상 기간: $SATURDAY (토) ~ $FRIDAY (금)"
 
 > **참고**: macOS `date` 명령어 사용. GNU date와 문법이 다름.
 
-2. **출력 경로 확인**
+2. **파일 목록 선계산** (공백 포함 경로 안전 처리)
+
 ```bash
-OUTPUT_FILE="$OBSIDIAN_VAULT/newsletters/${WEEK_NUM}-newsletter.md"
+# Daily Notes 파일 목록 선계산 (-newermt: 공백 경로 안전)
+DAILY_FILES=$(find "$OBSIDIAN_VAULT/$DAILY_NOTE_DIR" -name "*.md" -type f \
+  -newermt "${SATURDAY} 00:00:00" ! -newermt "${NEXT_DAY} 00:00:00" \
+  2>/dev/null | sort)
+
+# 주간 기술 문서 파일 목록 선계산
+DOC_FILES=$(find \
+  "$OBSIDIAN_VAULT/$INBOX_DIR" \
+  "$OBSIDIAN_VAULT/$NOTES_DIR" \
+  -name "*.md" -type f \
+  -newermt "${SATURDAY} 00:00:00" ! -newermt "${NEXT_DAY} 00:00:00" \
+  2>/dev/null | sort | head -10)
+```
+
+> **주의**: `stat -f "%Sm %N"` + awk 방식은 공백 포함 경로에서 경로가 잘려 동작 불능. `-newermt`는 경로 파싱 없이 mtime 비교만 하여 안전.
+
+3. **출력 경로 확인**
+```bash
+OUTPUT_FILE="$OBSIDIAN_VAULT/$NEWSLETTER_DIR/${WEEK_NUM}-newsletter.md"
 ```
 
 ---
@@ -152,42 +171,22 @@ OUTPUT_FILE="$OBSIDIAN_VAULT/newsletters/${WEEK_NUM}-newsletter.md"
 **프롬프트 (SATURDAY, FRIDAY, NEXT_DAY 치환 필요):**
 
 ```
-당신은 Daily Notes 분석 전문가입니다. 코드를 작성하지 말고 분석만 수행하세요.
+{SATURDAY}~{FRIDAY} Daily Notes 분석. Read 도구로 아래 파일들을 읽고 요약하세요.
 
-## 작업
-{SATURDAY} (토) ~ {FRIDAY} (금) 기간의 Daily Notes를 분석하여 주간 업무 하이라이트를 추출합니다.
+## 읽을 파일
+{DAILY_FILES_LIST}
 
-## 경로
-- Daily Notes: $OBSIDIAN_VAULT/$DAILY_NOTE_DIR/
+포함: 기술 학습, 해결한 문제, 외부 공유 적합 인사이트
+제외: 내부 업무, 개인 일정, 고객/파트너 정보
 
-## 실행 단계
-1. Bash로 해당 주 Daily Notes 찾기 (macOS 호환):
-   find $OBSIDIAN_VAULT/$DAILY_NOTE_DIR -name "*.md" -type f \
-     -exec stat -f "%Sm %N" -t "%Y-%m-%d" {} \; 2>/dev/null | \
-     awk -v start="{SATURDAY}" -v end="{FRIDAY}" '$1 >= start && $1 <= end {print $2}'
-
-2. 각 Daily Note 읽기 (Read 도구 사용)
-
-3. 추출할 내용:
-   - 주요 업무 하이라이트
-   - 기술 학습 내용
-   - 해결한 문제들
-   - 외부 공유에 적합한 인사이트
-
-## 필터링 기준
-**포함**: 기술 트렌드, 학습 방법론, 팀 운영 인사이트
-**제외**: 내부 업무 세부사항, 개인 일정, 고객/파트너 정보
-
-## 출력 형식 (마크다운으로 반환)
+## 출력 (마크다운, 간결하게)
 ### 주간 업무 하이라이트
-- **[날짜]**: 주요 작업 및 성과
-- **[날짜]**: 주요 작업 및 성과
+- **[날짜]**: 핵심 1줄
 
 ### 기술 학습
-- 학습 내용 1
-- 학습 내용 2
+- 항목 1줄씩
 
-(Daily Notes가 없으면 "해당 주에 Daily Notes 없음" 반환)
+(파일 없으면 "Daily Notes 없음")
 ```
 
 ---
@@ -204,44 +203,25 @@ OUTPUT_FILE="$OBSIDIAN_VAULT/newsletters/${WEEK_NUM}-newsletter.md"
 **프롬프트 (SATURDAY, FRIDAY, NEXT_DAY 치환 필요):**
 
 ```
-당신은 Obsidian Vault 문서 분석 전문가입니다. 코드를 작성하지 말고 분석만 수행하세요.
+{SATURDAY}~{FRIDAY} 기술 문서 분석. Read 도구로 아래 파일들을 읽고 외부 공유 가치를 평가하세요.
 
-## 작업
-{SATURDAY} (토) ~ {FRIDAY} (금) 기간에 생성/수정된 기술 문서들을 분석하여 외부 공유 적합 내용을 추출합니다.
+## 읽을 파일
+{DOC_FILES_LIST}
 
-## 경로
-- Vault: $OBSIDIAN_VAULT/
-- 분석 대상: $INBOX_DIR, $NOTES_DIR
+포함: AI/아키텍처/개발 방법론, 리더십, 학습 방법론
+제외: 내부 업무, 회사 프로세스, 개인 일정, 고객 정보
 
-## 실행 단계
-1. Bash로 해당 주에 수정된 .md 파일 찾기 (macOS 호환):
-   find $OBSIDIAN_VAULT \( -path "*/001-Inbox/*" -o -path "*/002-Notes/*" \) \
-     -name "*.md" -type f -exec stat -f "%Sm %N" -t "%Y-%m-%d" {} \; 2>/dev/null | \
-     awk -v start="{SATURDAY}" -v end="{FRIDAY}" '$1 >= start && $1 <= end {print $2}'
-
-2. 발견된 파일 중 중요 문서 읽기 (Read 도구 사용, 최대 10개)
-
-3. 분류 기준:
-   - 기술 트렌드 (AI, 아키텍처, 개발 방법론)
-   - 리더십/조직 인사이트
-   - 학습 방법론
-   - 업계 동향
-
-## 필터링 기준
-**포함**: SDD, AI 코딩 도구, 새로운 아키텍처 패턴, 효과적인 매니저 특징, AI 활용 학습법
-**제외**: 내부 업무 세부사항, 회사 고유 프로세스, 개인 일정, 고객/파트너 정보
-
-## 출력 형식 (마크다운으로 반환)
+## 출력 (마크다운, 문서당 2줄 이내)
 ### 기술 트렌드
-- **[문서명]**: 핵심 내용 요약 (2-3줄)
+- **[파일명]**: 핵심 2줄
 
-### 리더십 & 조직 인사이트
-- **[문서명]**: 핵심 내용 요약
+### 리더십 & 조직
+- **[파일명]**: 핵심 2줄
 
 ### 학습 방법론
-- **[문서명]**: 핵심 내용 요약
+- **[파일명]**: 핵심 2줄
 
-(수정된 문서가 없으면 "해당 주에 수정된 기술 문서 없음" 반환)
+(해당 없으면 섹션 생략, 파일 없으면 "기술 문서 없음")
 ```
 
 ---
@@ -253,7 +233,7 @@ OUTPUT_FILE="$OBSIDIAN_VAULT/newsletters/${WEEK_NUM}-newsletter.md"
 
 2. **뉴스레터 작성**
 
-   Write 도구를 사용하여 `newsletters/{WEEK_NUM}-newsletter.md` 생성:
+   Write 도구를 사용하여 `$NEWSLETTER_DIR/{WEEK_NUM}-newsletter.md` 생성:
 
 ```markdown
 ---
@@ -317,7 +297,7 @@ period: {SATURDAY} ~ {FRIDAY}
 
 4. **완료 메시지 출력**
 ```
-{WEEK_NUM} 뉴스레터가 생성되었습니다: newsletters/{WEEK_NUM}-newsletter.md
+{WEEK_NUM} 뉴스레터가 생성되었습니다: $NEWSLETTER_DIR/{WEEK_NUM}-newsletter.md
 ```
 
 ---
@@ -331,8 +311,8 @@ period: {SATURDAY} ~ {FRIDAY}
 3. **결과만 반환**: 각 서브 에이전트는 마크다운 형식의 분석 결과 텍스트만 반환합니다.
 
 4. **메인 에이전트 역할 최소화**:
-   - Phase 1: 날짜 계산만 수행
-   - Phase 2: Task 호출만 수행 (분석 로직 없음)
+   - Phase 1: 날짜 계산 + 파일 목록 선계산 (find -newermt, 1회 실행)
+   - Phase 2: Task 호출만 수행 (파일 목록을 프롬프트에 직접 삽입)
    - Phase 3: 결과 조합 및 뉴스레터 작성만 수행
 
 ---
@@ -407,7 +387,7 @@ daily-work-logger (매일)
         ↓
 weekly-newsletter (토요일) ← 이 skill
         ↓
-    newsletters/YYYY-WXX-newsletter.md
+    $NEWSLETTER_DIR/YYYY-WXX-newsletter.md
 ```
 
 ---

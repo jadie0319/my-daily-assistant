@@ -166,6 +166,31 @@ daily-work-logger 2026-03-12
 
 ---
 
+#### Weekly Newsletter
+
+이번 주 토요일~금요일 구간의 Daily Note와 주간 수정 문서를 모아 외부 공유용 뉴스레터를 생성합니다. Claude 스킬을 참고해 만들었지만, Codex 실행 시에는 `.codex` 스크립트와 루트 `env.config`만 사용합니다.
+
+**Claude Code:**
+`.claude/skills/weekly-newsletter` 참고용 스킬이 이미 존재합니다.
+
+**Codex:**
+```bash
+./.codex/bin/weekly-newsletter
+./.codex/bin/weekly-newsletter 2026-W03
+./.codex/bin/weekly-newsletter --sync 2026-W03
+./.codex/bin/newsletter-progress
+```
+
+공통 동작:
+- 주차 인수가 없으면 현재 ISO 주차를 사용합니다.
+- 뉴스레터 주간 범위는 항상 `토요일 ~ 금요일`입니다.
+- 입력 소스는 `{OBSIDIAN_VAULT}{DAILY_NOTE_DIR}/` 와 `{OBSIDIAN_VAULT}{INBOX_DIR}`, `{OBSIDIAN_VAULT}{NOTES_DIR}` 입니다.
+- 저장 위치는 `env.config`의 `NEWSLETTER_DIR` 값을 사용합니다.
+- 출력 위치는 `{OBSIDIAN_VAULT}{NEWSLETTER_DIR}/YYYY-WNN-newsletter.md` 입니다.
+- 개인 일정, 내부 업무 세부, 고객/파트너 정보는 제외하고 외부 공유 가능한 기술/리더십/학습 인사이트 중심으로 정리합니다.
+
+---
+
 ## Claude Code Skills (`.claude/skills/`)
 
 대화 중 자동으로 트리거되는 skill 모음입니다. 별도 명령 없이 자연어 요청으로 실행됩니다.
