@@ -10,7 +10,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
 THIS_FILE = Path(__file__).resolve()
@@ -63,9 +63,18 @@ def parse_user_input(arguments: list[str]) -> SummaryInput:
     parsed = urlparse(value)
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         mode = "url"
+    elif is_pdf_input(value):
+        mode = "pdf"
     else:
         mode = "text"
     return SummaryInput(lang=lang, mode=mode, value=value)
+
+
+def is_pdf_input(value: str) -> bool:
+    parsed = urlparse(value)
+    if parsed.scheme == "file":
+        return parsed.path.lower().endswith(".pdf")
+    return value.lower().endswith(".pdf")
 
 
 def slugify(value: str, fallback: str = "article") -> str:
@@ -102,6 +111,10 @@ def create_progress_file(user_input: SummaryInput) -> Path:
         parsed = urlparse(user_input.value)
         key = slugify(f"{parsed.netloc}-{parsed.path}", fallback="article")[:48]
         return PROGRESS_DIR / f"{timestamp}-article-{key}.json"
+    if user_input.mode == "pdf":
+        pdf_path = resolve_pdf_path(user_input.value)
+        key = slugify(pdf_path.stem, fallback="pdf")[:48]
+        return PROGRESS_DIR / f"{timestamp}-pdf-{key}.json"
     key = slugify(user_input.value[:30], fallback="text")[:48]
     return PROGRESS_DIR / f"{timestamp}-article-text-{key}.json"
 
@@ -151,6 +164,48 @@ def derive_text_title(text: str) -> str:
     else:
         candidate = normalized[:80].strip()
     return clean_filename(candidate[:80])
+
+
+def resolve_pdf_path(value: str) -> Path:
+    parsed = urlparse(value)
+    if parsed.scheme == "file":
+        raw_path = unquote(parsed.path or "")
+        if parsed.netloc:
+            raw_path = f"//{parsed.netloc}{raw_path}"
+        pdf_path = Path(raw_path)
+    else:
+        pdf_path = Path(value).expanduser()
+    return pdf_path.resolve()
+
+
+def derive_pdf_title(pdf_path: Path) -> str:
+    return clean_filename(re.sub(r"[-_]+", " ", pdf_path.stem).strip())
+
+
+def extract_pdf_content(pdf_path: Path) -> str:
+    if not pdf_path.is_file():
+        raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+
+    try:
+        import pdfplumber
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("pdfplumber is required for PDF summarization") from exc
+
+    chunks: list[str] = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text() or ""
+            text = text.strip()
+            if text:
+                chunks.append(text)
+
+    content = "\n\n".join(chunks).strip()
+    content = re.sub(r"\n{3,}", "\n\n", content)
+    if len(content) < 100:
+        raise RuntimeError("PDF content is too short or appears to be image-only")
+    if len(content) > 120_000:
+        content = content[:120_000] + "\n\n[...TRUNCATED FOR PROCESSING LIMIT...]"
+    return content
 
 
 def build_prompt(
@@ -381,6 +436,13 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
             images = article_data.get("images") or []
             if not isinstance(images, list):
                 images = []
+        elif user_input.mode == "pdf":
+            pdf_path = resolve_pdf_path(user_input.value)
+            title = derive_pdf_title(pdf_path)
+            author = ""
+            source = str(pdf_path)
+            content = extract_pdf_content(pdf_path)
+            images = []
         else:
             title = derive_text_title(user_input.value)
             author = ""
@@ -474,7 +536,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sync", action="store_true", help="run in foreground")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--lang", choices=["kr", "en"], help=argparse.SUPPRESS)
-    parser.add_argument("--mode", choices=["url", "text"], help=argparse.SUPPRESS)
+    parser.add_argument("--mode", choices=["url", "text", "pdf"], help=argparse.SUPPRESS)
     parser.add_argument("--input", dest="worker_input", help=argparse.SUPPRESS)
     parser.add_argument("--progress-file", help=argparse.SUPPRESS)
     parser.add_argument("arguments", nargs="*")
@@ -512,6 +574,8 @@ def main() -> int:
     }
     if user_input.mode == "url":
         payload["url"] = user_input.value
+    elif user_input.mode == "pdf":
+        payload["file"] = str(resolve_pdf_path(user_input.value))
     else:
         payload["input"] = "text"
         payload["text_preview"] = user_input.value[:80]
@@ -524,6 +588,8 @@ def main() -> int:
     print("Background job started")
     if user_input.mode == "url":
         print(f"- URL: {user_input.value}")
+    elif user_input.mode == "pdf":
+        print(f"- PDF: {resolve_pdf_path(user_input.value)}")
     else:
         print(f"- Input: text ({len(user_input.value)} chars)")
     print(f"- Progress: {progress_file}")

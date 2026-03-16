@@ -1,19 +1,20 @@
 ---
-argument-hint: "[url 또는 텍스트]"
-description: "기술 문서 URL 또는 텍스트 → 번역/정리 → env.config 의 ARTICLE_DIR 을 참고해서  obsidian 문서 생성"
+argument-hint: "[url, 텍스트, 또는 PDF 파일 경로]"
+description: "기술 문서 URL, 텍스트, 또는 로컬 PDF 파일 → 번역/정리 → env.config 의 ARTICLE_DIR 을 참고해서  obsidian 문서 생성"
 color: yellow
 ---
 
 # article summarize - $ARGUMENTS
 
-기술 문서 URL 또는 텍스트를 받아 **백그라운드**로 번역/정리하여 Obsidian 문서를 생성합니다.
+기술 문서 URL, 텍스트, 또는 로컬 PDF 파일을 받아 **백그라운드**로 번역/정리하여 Obsidian 문서를 생성합니다.
 
 ## 입력 타입 판별
 
-`$ARGUMENTS`의 앞 8자를 확인한다:
+`$ARGUMENTS`를 순서대로 확인한다:
 
-- `http://` 또는 `https://`로 시작하면 → **URL 모드** (기존 동작)
-- 그 외 → **텍스트 모드** (새 동작)
+1. `http://` 또는 `https://`로 시작하면 → **URL 모드**
+2. `.pdf`로 끝남 (대소문자 무관) 또는 `file://`로 시작하면 → **PDF 모드**
+3. 그 외 → **텍스트 모드**
 
 텍스트 모드에서 `$ARGUMENTS`가 200자 미만이면 경고를 출력한다:
 ```
@@ -75,6 +76,19 @@ ATTACHMENT_OUTPUT_DIR="${OBSIDIAN_VAULT}${ATTACHMENT_DIR}"
 }
 ```
 
+**PDF 모드** 파일명: `YYYYMMDD-HHMMSS-pdf-{파일명-stem-30자}.json`
+```json
+{
+  "file": "$ARGUMENTS",
+  "type": "article",
+  "status": "processing",
+  "started_at": "현재시간 ISO-8601",
+  "completed_at": null,
+  "output_file": null,
+  "error": null
+}
+```
+
 ### Step 2: 백그라운드 subagent 시작
 
 Task tool을 사용하여 백그라운드 subagent를 시작합니다:
@@ -83,6 +97,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 - `run_in_background`: true
 - **URL 모드** `description`: "Summarize: {URL 도메인/경로 일부}"
 - **텍스트 모드** `description`: "Summarize text: {텍스트 앞 30자}"
+- **PDF 모드** `description`: "Summarize PDF: {파일명 without extension}"
 - `prompt`: 아래 동기 모드 프로세스 전체를 포함하되, 다음을 추가:
   - progress 파일 경로를 전달
   - 작업 완료 후 progress 파일을 completed로 업데이트하도록 지시
@@ -107,6 +122,14 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 - 완료되면 자동으로 알려드립니다.
 ```
 
+**PDF 모드:**
+```
+백그라운드 작업 시작됨:
+- PDF: $ARGUMENTS
+- Progress: .claude/article-progress/{파일명}.json
+- 완료되면 자동으로 알려드립니다.
+```
+
 ## 동기 모드 (subagent에서 호출 시 / 백그라운드 subagent 내부)
 
 ### Step 1: 콘텐츠 추출
@@ -124,6 +147,18 @@ WebFetch 결과에서 다음을 파악한다:
 
 본문이 200자 미만이면 로그인 wall 또는 접근 제한 가능성이 있으므로 사용자에게 안내한다.
 
+**PDF 모드**: Read 도구로 PDF 파일을 직접 읽어 콘텐츠를 추출한다.
+
+1. **파일 존재 확인**: Bash `test -f "$ARGUMENTS"` 로 파일 존재 여부 확인. 없으면 progress 파일을 `failed`로 업데이트하고 중단
+2. **콘텐츠 추출 (청크 방식)**: Read 도구로 10페이지씩 반복 읽기
+   - `pages: "1-10"` → `pages: "11-20"` → `pages: "21-30"` → ...
+   - 빈 결과(내용 없음)가 나올 때까지 반복
+   - 각 청크 결과를 순서대로 concat
+3. **title**: 파일명에서 경로와 확장자 제거, `-`와 `_`를 공백으로 치환
+4. **author**: 빈 문자열
+5. **content**: 모든 청크를 합친 전체 텍스트
+6. content가 100자 미만이면 빈 PDF 또는 이미지 전용 PDF로 판단 → progress 파일을 `failed`로 업데이트 후 중단
+
 **텍스트 모드**: WebFetch를 스킵하고 다음을 설정한다.
 
 - **title**: 텍스트에서 첫 번째 `#` 마크다운 헤딩을 추출. 없으면 첫 문장(최대 80자)을 title로 사용
@@ -134,12 +169,15 @@ WebFetch 결과에서 다음을 파악한다:
 
 추출된 콘텐츠를 아래 규칙(`## 문서 번역 및 요약 규칙`)에 따라 정리하여 yaml frontmatter를 포함한 obsidian 파일로 저장합니다.
 
-- 저장 경로: `$OBSIDIAN_VAULT/$ARTICLE_DIR/`
+- 저장 경로: `$OBSIDIAN_VAULT/$ARTICLE_DIR/YYYY-MM-DD {문서제목}.md`
+  - 날짜는 파일 생성 시점의 `date +%Y-%m-%d` 값 사용
+  - 예: `2026-03-16 10 Essential Software Design Patterns.md`
+- 디렉터리가 없으면 생성: `mkdir -p "$ARTICLE_OUTPUT_DIR"`
 - hierarchical tagging 규칙: `~/.claude/commands/obsidian/add-tag.md` 준수
 
 ### Step 3: 이미지 처리
 
-**텍스트 모드인 경우 이 단계를 완전히 스킵한다.**
+**텍스트 모드 또는 PDF 모드인 경우 이 단계를 완전히 스킵한다.**
 
 **URL 모드**: WebFetch 결과에 이미지 URL이 포함된 경우, ATTACHMENTS 폴더에 저장하고 Obsidian 문서에 포함시킵니다.
 
@@ -203,9 +241,9 @@ source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-u
 
 - id: 문서에서 발견한 제목 (WebFetch 또는 텍스트에서 추출한 title 사용). **콜론(`:`)이 포함된 경우 반드시 따옴표로 감쌀 것** (예: `id: "제목: 부제목"`)
 - aliases: 문서에서 발견한 제목의 한국어 번역
-- author: 문서에서 발견한 작성자. 이름은 다 소문자, 공백은 '-'로 변경. **텍스트 모드인 경우 빈 문자열**
+- author: 문서에서 발견한 작성자. 이름은 다 소문자, 공백은 '-'로 변경. **텍스트 모드 또는 PDF 모드인 경우 빈 문자열**
 - created: obsidian 파일 생성 시점
-- source: 문서 url. **텍스트 모드인 경우 생략 또는 빈 문자열**
+- source: 문서 url. **텍스트 모드인 경우 생략 또는 빈 문자열**. **PDF 모드인 경우 파일 절대 경로**
 
 ## 문서 번역 및 요약 규칙
 
@@ -263,6 +301,8 @@ Remember to include all necessary subsections as described in the summary struct
 메인 세션에서 현재 진행 중인 백그라운드 작업을 확인하려면:
 
 `.claude/article-progress/` 폴더의 JSON 파일들을 읽어서 상태를 보고합니다:
-- `processing`: "처리 중: URL"
-- `completed`: "완료: URL → 파일경로"
-- `failed`: "실패: URL (에러메시지)"
+- `processing`: "처리 중: {url 또는 file 경로}"
+- `completed`: "완료: {url 또는 file 경로} → 파일경로"
+- `failed`: "실패: {url 또는 file 경로} (에러메시지)"
+
+JSON에 `url` 키가 있으면 URL로, `file` 키가 있으면 파일 경로로 표시한다.

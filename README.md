@@ -102,27 +102,32 @@ YouTube 영상의 자막을 추출·번역하여 Obsidian 노트로 저장합니
 ./.codex/bin/youtube-progress   # 진행 상태 확인
 ```
 
+출력 파일명: `YYYY-MM-DD {영상제목} (claude).md` (날짜 접두사 포함)
 출력 위치: `{OBSIDIAN_VAULT}/02.Zattelkasten/001_Inbox/`
 
 ---
 
 #### 기술 문서 요약 (Article Summarize)
 
-기술 문서 URL 또는 텍스트를 번역/정리하여 Obsidian 노트로 저장합니다.
+기술 문서 URL, 텍스트, 또는 로컬 PDF를 번역/정리하여 Obsidian 노트로 저장합니다.
 
 **Claude Code:**
 ```
 /obsidian:summarize_article https://example.com/post
+/obsidian:summarize_article /Users/me/Documents/paper.pdf
 /obsidian:summarize_article # 제목\n\n본문 텍스트...
 ```
 
-- URL(`http://`, `https://`로 시작)과 **텍스트 직접 입력** 두 가지 모드 지원
+- URL(`http://`, `https://`로 시작), 로컬 PDF(`.pdf`, `file://`), **텍스트 직접 입력** 세 가지 모드 지원
+- PDF 모드: 파일명으로 제목을 만들고, `source`에는 PDF 절대 경로를 기록
 - 텍스트 모드: 200자 미만이면 경고 출력 후 계속 처리
 - 직접 호출 시 백그라운드 실행, subagent 내부 호출 시 동기 실행
+- 출력 파일명: `YYYY-MM-DD {문서제목}.md` (날짜 접두사 포함)
 
 **Codex:**
 ```bash
 ./.codex/bin/summarize-article kr "https://example.com/post"
+./.codex/bin/summarize-article kr "./paper.pdf"
 ./.codex/bin/summarize-article kr "# 제목\n\n본문..."
 ./.codex/bin/article-progress   # 진행 상태 확인
 ```

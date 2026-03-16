@@ -25,8 +25,10 @@ There is no separate build step. Use these commands:
 - `./.codex/bin/summarize-youtube kr "<youtube_url>"`: start background summarize job.
 - `./.codex/bin/summarize-youtube --sync en "<youtube_url>"`: run foreground.
 - `./.codex/bin/youtube-progress`: show processing/completed/failed jobs.
-- `./.codex/bin/summarize-article kr "<article_url>"`: start background article summarize job.
-- `./.codex/bin/summarize-article --sync en "<article_url>"`: run article summarize in foreground.
+- `./.codex/bin/summarize-article kr "<article_url>"`: start background article summarize job from a URL.
+- `./.codex/bin/summarize-article kr "./paper.pdf"`: start background article summarize job from a local PDF.
+- `./.codex/bin/summarize-article --sync en "<article_url>"`: run article summarize in foreground from a URL.
+- `./.codex/bin/summarize-article --sync kr "file:///Users/me/paper.pdf"`: run article summarize in foreground from a local PDF.
 - `./.codex/bin/article-progress`: show article job status.
 - `python3 -m py_compile .codex/skills/obsidian-youtube-summarize/scripts/*.py`: syntax check.
 - `python3 -m py_compile .codex/skills/obsidian-article-summarize/scripts/*.py`: syntax check.
@@ -40,9 +42,10 @@ Claude slash commands are replaced by local wrappers in `.codex/bin/`.
 - Progress tracking: `.codex/article-progress/YYYYMMDD-HHMMSS-youtube-<id>.json`.
 - Main replacement: `summarize-article` (equivalent to `summarize_article.md` workflow).
 - Engine: `.codex/skills/obsidian-article-summarize/scripts/summarize_article.py`.
+- Supported inputs: article URL, plain text, local PDF path, or `file://` PDF path.
 - Output target: `{OBSIDIAN_VAULT}{ARTICLE_DIR}/YYYY-MM-DD <title> (codex).md`.
 - Attachments target: `{OBSIDIAN_VAULT}{ATTACHMENT_DIR}/`.
-- Progress tracking: `.codex/article-progress/YYYYMMDD-HHMMSS-article-<slug>.json`.
+- Progress tracking: `.codex/article-progress/YYYYMMDD-HHMMSS-article-<slug>.json`, `.codex/article-progress/YYYYMMDD-HHMMSS-article-text-<slug>.json`, or `.codex/article-progress/YYYYMMDD-HHMMSS-pdf-<slug>.json`.
 
 ## Coding Style & Naming Conventions
 - Language: Python 3 and Markdown.
@@ -55,6 +58,7 @@ Automated tests are not set up yet. Minimum checks:
 
 - Validate one real YouTube URL and one failure input.
 - Validate one real article URL and one failure URL.
+- Validate one real PDF path and one missing/invalid PDF path.
 - Confirm progress transitions: `processing -> completed|failed`.
 - Verify created note path and frontmatter fields in Obsidian output (`author`, `tool`, `source`).
 - Include command/output evidence in PR notes.
