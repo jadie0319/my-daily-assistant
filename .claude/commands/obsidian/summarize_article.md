@@ -137,7 +137,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 **URL 모드**: `WebFetch` 도구로 URL에 접근하여 콘텐츠를 추출합니다.
 
 - URL: `$ARGUMENTS`
-- prompt: "이 기술 문서의 전체 내용을 추출하라. 제목, 작성자, 본문 전체(모든 섹션, 코드 예제 포함)를 빠짐없이 반환하라."
+- prompt: "이 기술 문서의 전체 내용을 추출하라. 제목, 작성자, 본문 전체(모든 섹션, 코드 예제 포함)를 빠짐없이 반환하라. 본문에 포함된 이미지 URL도 마크다운 이미지 문법(![alt](url))으로 모두 포함하라."
 - 실패 시: 에러 보고 후 중단 (progress 파일을 `failed`로 업데이트)
 
 WebFetch 결과에서 다음을 파악한다:
@@ -177,16 +177,101 @@ WebFetch 결과에서 다음을 파악한다:
 
 ### Step 3: 이미지 처리
 
-**텍스트 모드 또는 PDF 모드인 경우 이 단계를 완전히 스킵한다.**
+**텍스트 모드인 경우 이 단계를 완전히 스킵한다.**
 
 **URL 모드**: WebFetch 결과에 이미지 URL이 포함된 경우, ATTACHMENTS 폴더에 저장하고 Obsidian 문서에 포함시킵니다.
 
 - ATTACHMENTS 경로: `$OBSIDIAN_VAULT/$ATTACHMENT_DIR/`
 - 이미지 URL이 없으면 이 단계를 건너뜀
-- 이미지 다운로드에는 bash curl을 사용합니다:
-  ```bash
-  curl -sL -o $OBSIDIAN_VAULT/$ATTACHMENT_DIR/{filename} "{image_url}"
-  ```
+
+#### 이미지 URL 추출
+
+WebFetch 결과에서 `![alt](url)` 패턴으로 이미지 URL 목록을 수집한다.
+
+#### 필터링 규칙
+
+- URL 패턴 제외: `gravatar`, `avatar`, `favicon`, `icon`, `logo`, `badge`, `tracking`, `pixel`, `analytics`
+- 허용 확장자: `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `avif`
+- 다운로드 후 5KB 미만 파일 삭제 (SVG는 1KB 기준)
+- 최대 20개 이미지 제한
+
+#### 파일명 규칙
+
+```
+{YYYYMMDD}-{article-title-slug-30자}-{NN}.{ext}
+```
+- 날짜: 노트 파일명과 동일한 날짜
+- slug: 제목 소문자화, 공백→하이픈, 비영숫자 제거, 30자 제한
+- NN: 01부터 순차 번호
+
+#### 다운로드
+
+```bash
+curl -sL --max-time 15 --max-filesize 10485760 \
+  -o "$ATTACHMENT_OUTPUT_DIR/{filename}" "{image_url}"
+```
+- 경로에 공백 포함 시 반드시 따옴표 처리
+- 실패 시 해당 이미지만 스킵 (전체 프로세스 중단 안 함)
+
+#### 요약 문서에 임베딩
+
+다운로드된 이미지가 0개면 이미지 임베딩을 스킵한다.
+
+각 이미지의 내용과 요약 본문의 챕터(### 소제목)를 대조하여,
+해당 이미지가 설명하는 내용과 가장 관련 깊은 챕터의 끝에 인라인으로 배치한다.
+
+어느 챕터에도 명확히 매칭되지 않는 이미지는 문서 끝에 `## 참고 이미지` 섹션을 만들어 배치한다.
+매칭되지 않는 이미지가 없으면 `## 참고 이미지` 섹션을 생략한다.
+
+**PDF 모드**: `extract_pdf_images.py` 스크립트로 PDF에서 이미지를 추출한 뒤, 관련성 필터링을 거쳐 선별된 이미지만 Obsidian 문서에 포함시킨다.
+
+#### PDF 이미지 추출
+
+```bash
+python3 /Users/jdragon/my-daily-assistant/.claude/commands/obsidian/extract_pdf_images.py \
+  --pdf "$ARGUMENTS" \
+  --output-dir "$ATTACHMENT_OUTPUT_DIR" \
+  --prefix "{YYYYMMDD}-{pdf-title-slug-30자}" \
+  --min-size 5120 \
+  --max-images 20
+```
+
+- prefix의 날짜와 slug는 URL 모드의 파일명 규칙과 동일
+- 스크립트가 실패하거나 이미지가 0개면 이 단계를 건너뜀 (전체 프로세스 중단 안 함)
+- 스크립트 stdout의 JSON에서 `images` 배열로 저장된 파일명 목록을 얻는다
+
+#### 관련성 필터링
+
+추출된 각 이미지 파일을 Read 도구로 열어 시각적으로 확인한다. 다음 기준으로 관련 이미지만 선별:
+
+**포함 대상** (요약 내용을 보충하는 이미지):
+- 아키텍처 다이어그램, 시스템 구성도
+- 플로우차트, 시퀀스 다이어그램
+- 코드 스니펫 스크린샷
+- 데이터 차트, 그래프
+- 개념 설명 그림
+
+**제외 대상**:
+- 로고, 아이콘, 배지
+- 저자 사진, 프로필 이미지
+- 장식용 배경, 구분선
+- 광고, 프로모션 이미지
+- 중복되거나 유사한 이미지 (대표 1개만 유지)
+
+선별되지 않은 이미지는 ATTACHMENTS 폴더에서 삭제한다:
+```bash
+rm -f "$ATTACHMENT_OUTPUT_DIR/{제외된-파일명}"
+```
+
+#### 요약 문서에 임베딩
+
+선별된 이미지가 0개면 이미지 임베딩을 스킵한다.
+
+각 이미지를 Read 도구로 확인한 내용과 요약 본문의 챕터(### 소제목)를 대조하여,
+해당 이미지가 설명하는 내용과 가장 관련 깊은 챕터의 끝에 인라인으로 배치한다.
+
+어느 챕터에도 명확히 매칭되지 않는 이미지는 문서 끝에 `## 참고 이미지` 섹션을 만들어 배치한다.
+매칭되지 않는 이미지가 없으면 `## 참고 이미지` 섹션을 생략한다.
 
 ### Step 4: Progress 파일 업데이트 (백그라운드 모드 시)
 

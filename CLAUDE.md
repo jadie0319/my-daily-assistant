@@ -36,7 +36,7 @@ Summarizes a technical document and saves it as an Obsidian note.
 PDF mode specifics:
 - Title is derived from the filename (strip path/extension, replace `-`/`_` with spaces)
 - `source` in YAML frontmatter is set to the absolute file path
-- Image processing step is skipped
+- Images are extracted from PDF using `extract_pdf_images.py` and embedded in the note
 
 ### `summarize_youtube`
 
@@ -50,13 +50,14 @@ Uses `get_youtube_transcript.py` (in the same directory) to extract metadata and
 ## Dependencies
 
 ```bash
-pip3 install youtube-transcript-api yt-dlp
+pip3 install youtube-transcript-api yt-dlp PyMuPDF
 ```
 
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `youtube-transcript-api` | >= 1.2.4 | YouTube subtitle extraction |
 | `yt-dlp` | >= 2026.3.3 | Video metadata (title, channel) extraction |
+| `PyMuPDF` | >= 1.24 | PDF 이미지 추출 |
 
 The `youtube-transcript-api` uses instance-based `YouTubeTranscriptApi()` with `.fetch()` and `.to_raw_data()`.
 
