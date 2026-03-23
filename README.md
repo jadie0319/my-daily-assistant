@@ -36,7 +36,8 @@
 ```
 my-daily-assistant/
 ├── .claude/
-│   ├── commands/obsidian/      # Claude Code 슬래시 커맨드
+│   ├── commands/obsidian/      # Claude Code 슬래시 커맨드 (Obsidian)
+│   ├── commands/wiki/          # Claude Code 슬래시 커맨드 (Confluence)
 │   ├── skills/                 # Claude Code 자동 적용 스킬
 │   └── article-progress/       # Claude Code 작업 진행 상태
 ├── .codex/
@@ -220,6 +221,50 @@ weekly-claude-analytics
 weekly-newsletter
   └── Vault 파일 분석 → 외부 공유 뉴스레터
 ```
+
+---
+
+## Wiki Commands (`.claude/commands/wiki/`)
+
+사내 Confluence 위키와 연동하는 슬래시 커맨드 모음입니다.
+
+### Confluence Document Writer
+
+Playwright MCP를 사용해 로컬 Obsidian 노트를 사내 Confluence 위키에 자동으로 게시합니다.
+
+**사용법:**
+```
+/wiki:obsidian-document-writer inbox/파일명.md
+/wiki:obsidian-document-writer notes/파일명.md
+/wiki:obsidian-document-writer 상대경로/파일명.md
+/wiki:obsidian-document-writer 페이지 제목
+/wiki:obsidian-document-writer              # 인터랙티브 모드
+```
+
+**입력 모드:**
+
+| 모드 | 조건 | 동작 |
+|------|------|------|
+| **파일 모드** | 인자가 `.md`로 끝남 | 파일 내용을 읽어 제목/본문 자동 추출 |
+| **인터랙티브 모드** | 인자가 없거나 `.md`가 아님 | 제목과 본문을 대화형으로 수집 |
+
+**파일 경로 매핑:**
+
+| 입력 프리픽스 | 실제 경로 |
+|--------------|-----------|
+| `inbox/` | `{OBSIDIAN_VAULT}{INBOX_DIR}/파일명.md` |
+| `notes/` | `{OBSIDIAN_VAULT}{NOTES_DIR}/파일명.md` |
+| 그 외 | `{OBSIDIAN_VAULT}/{인자}` |
+
+**처리 과정:**
+1. `env.config`에서 Confluence 접속 정보(`CONFLUENCE_URL`, `CONFLUENCE_SPACE_KEY` 등) 읽기
+2. Playwright로 Confluence 접속 및 자동 로그인 (세션 유지됨)
+3. 새 페이지 생성 → 제목 입력 → 마크다운을 HTML로 변환하여 본문 주입 → 게시
+4. 성공 시 생성된 페이지 URL 출력
+
+**필요 설정 (`env.config`):**
+- `CONFLUENCE_URL`, `CONFLUENCE_SPACE_KEY`, `CONFLUENCE_PARENT_PAGE_ID`
+- `CONFLUENCE_USERNAME`, `CONFLUENCE_PASSWORD`
 
 ---
 

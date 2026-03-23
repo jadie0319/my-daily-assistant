@@ -3,4 +3,5 @@ env.config
 .codex/article-progress
 .nvimlog
 .DS_Store
+.playwright-mcp/
 
