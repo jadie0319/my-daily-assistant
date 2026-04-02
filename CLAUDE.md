@@ -21,7 +21,7 @@ All environment settings are stored in `env.config` at the project root. Read th
 
 ## Slash Commands (`.claude/commands/obsidian/`)
 
-### `summarize_article`
+### `summarize-article`
 
 Summarizes a technical document and saves it as an Obsidian note.
 
@@ -38,7 +38,7 @@ PDF mode specifics:
 - `source` in YAML frontmatter is set to the absolute file path
 - Images are extracted from PDF using `extract_pdf_images.py` and embedded in the note
 
-### `summarize_youtube`
+### `summarize-youtube`
 
 Extracts transcript from a YouTube URL, translates/summarizes it, and saves as an Obsidian note.
 
