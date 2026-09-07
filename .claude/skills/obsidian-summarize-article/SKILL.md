@@ -104,6 +104,8 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
   - 작업 완료 후 progress 파일을 completed로 업데이트하도록 지시
   - 실패 시 progress 파일을 failed로 업데이트하도록 지시
   - **텍스트 모드인 경우**: `$ARGUMENTS` 전체 텍스트를 prompt에 포함하여 전달
+  - **`/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
+  - 저장 후 `scripts/check_obsidian_note.py --fix`와 `inbox-link --dry-run`을 실행하고 결과를 완료 보고에 남기도록 지시
 
 ### Step 3: 사용자에게 알림 후 즉시 반환
 
@@ -305,20 +307,28 @@ progress 파일 경로가 전달된 경우, 작업 완료/실패 시 업데이�
 }
 ```
 
+### Step 5: 검증 스크립트 실행 (필수, 생략 금지)
+
+저장한 노트에 대해 **반드시** 아래를 실행한다. 프롬프트 규칙과 무관하게 어휘표 밖 태그를 상위 태그로 바꾸고 `origin: library`를 보장한다.
+
+```bash
+python3 /Users/jdragon/my-daily-assistant/scripts/check_obsidian_note.py "<저장한 노트 절대경로>" --fix
+```
+
+- 출력의 `RESULT: OK`를 확인한다. `FAIL`이면 남은 위반을 완료 보고에 그대로 적는다.
+- `<!-- 태그 제안: ... -->` 주석이 붙었으면 완료 보고에 "어휘표 추가 후보"로 알린다.
+- 이어서 관련 노트 제안: `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 결과 표를 완료 보고에 포함한다(`--apply` 금지).
+
 ## yaml frontmatter 예시
 
 ```yaml
 id: "10 Essential Software Design Patterns used in Java Core Libraries"
 aliases: Java 코어 라이브러리에서 사용되는 10가지 필수 소프트웨어 디자인 패턴
 tags:
-  - patterns/design-patterns/java-implementation
-  - patterns/creational/factory-singleton-builder
-  - patterns/structural/adapter-facade-proxy
-  - patterns/behavioral/observer-strategy-template
-  - java/core-libraries/design-patterns
-  - frameworks/java/standard-library
-  - development/practices/object-oriented-design
-  - architecture/patterns/gof-patterns
+  - dev/architecture
+  - dev/code-quality
+  - dev/java
+  - source/article
 author: ali-zeynalli
 tool: claude
 created: 2025-09-04 11:39
@@ -327,7 +337,7 @@ source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-u
 origin: library
 ```
 
-> 위 예시의 태그는 옛 형식이다. 실제 값은 `95.Vault/태그 어휘.md`에서 고른다(예: `dev/architecture`, `dev/code-quality`, `dev/java`, `source/article`).
+> **태그는 위처럼 `95.Vault/태그 어휘.md`에 있는 값만** 쓴다(최상위 `ai/ dev/ invest/ self/ productivity/ business/` + `source/*` 하나). `patterns/creational/...` 같은 태그를 새로 만들지 않는다.
 
 - id: 문서에서 발견한 제목 (WebFetch 또는 텍스트에서 추출한 title 사용). **콜론(`:`)이 포함된 경우 반드시 따옴표로 감쌀 것** (예: `id: "제목: 부제목"`)
 - aliases: 문서에서 발견한 제목의 한국어 번역

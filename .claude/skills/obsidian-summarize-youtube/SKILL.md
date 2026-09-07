@@ -60,6 +60,8 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
     - progress 파일 경로를 전달
     - 작업 완료 후 progress 파일을 completed로 업데이트하도록 지시
     - 실패 시 progress 파일을 failed로 업데이트하도록 지시
+    - **`/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
+    - 저장 후 `scripts/check_obsidian_note.py --fix`와 `inbox-link --dry-run`을 실행하고 결과를 progress 파일 `notes` 필드와 완료 보고에 남기도록 지시
 
 ### Step 3: 사용자에게 알림 후 즉시 반환
 
@@ -160,7 +162,7 @@ fi
 4. **태그·origin 부여** — 규칙은 `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md`
     - 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에 있는 값만** 3~5개 + `source/video`. 먼저 그 파일을 Read 한다. 맞는 태그가 없으면 가장 가까운 상위 태그를 쓰고 새 태그는 만들지 않는다.
     - 프론트매터에 `origin: library`를 넣는다(필수). `related: []`는 비워 둔다.
-    - 파일명: `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거, 80자 이내.
+    - 파일명: `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거, 120자 이내.
 4-1. **관련 노트 링크 제안** (저장 직후)
     - `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 를 실행하고 제안 표를 완료 보고에 포함한다. **`--apply`는 하지 않는다**(사용자가 `/inbox-link`로 적용).
 5. **Progress 파일 업데이트 (백그라운드 모드 시)**
@@ -202,47 +204,57 @@ progress 파일 경로가 전달된 경우, 작업 완료/실패 시 업데이�
 rm -f "$YOUTUBE_TEMP_FILE"
 ```
 
+### Step 7: 검증 스크립트 실행 (필수, 생략 금지)
+
+저장한 노트에 대해 **반드시** 아래를 실행한다. 프롬프트 규칙과 무관하게 어휘표 밖 태그를 상위 태그로 바꾸고 `origin: library`를 보장한다.
+
+```bash
+python3 /Users/jdragon/my-daily-assistant/scripts/check_obsidian_note.py "<저장한 노트 절대경로>" --fix
+```
+
+- 출력의 `RESULT: OK`를 확인한다. `FAIL`이면 남은 위반을 완료 보고에 그대로 적는다.
+- `<!-- 태그 제안: ... -->` 주석이 붙었으면 완료 보고에 "어휘표 추가 후보"로 알린다.
+- 이어서 관련 노트 제안: `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 결과 표를 완료 보고에 포함한다(`--apply` 금지).
+
+
 ## yaml frontmatter 예시
 ### YouTube URL인 경우 자동 생성되는 frontmatter:
 
 ```yaml
-id: How to Implement Clean Architecture in Spring Boot
+id: "How to Implement Clean Architecture in Spring Boot"
 aliases: Spring Boot에서 Clean Architecture 구현 방법
 tags:
-  - architecture/clean-architecture/spring-implementation
-  - architecture/hexagonal/ports-adapters
-  - frameworks/spring-boot/architecture
-  - development/practices/clean-code
+  - dev/architecture
+  - dev/code-quality
+  - dev/workflow
+  - source/video
 author: coding-with-john
+tool: claude
 created: 2025-09-15 16:30
 related: []
 source: https://www.youtube.com/watch?v=lqQ_NL4y5Qg
-tool: claude
 origin: library
 ```
 
-> 위 예시의 태그는 옛 형식이다. 실제 값은 `95.Vault/태그 어휘.md`에서 고른다. 예: `ai/claude-code`, `ai/harness-engineering`, `dev/architecture`, `source/video`.
+> **태그는 위처럼 `95.Vault/태그 어휘.md`에 있는 값만** 쓴다(최상위 `ai/ dev/ invest/ self/ productivity/ business/` + `source/*` 하나). 옛 예시처럼 `architecture/clean-architecture/spring-implementation` 같은 태그를 새로 만들지 않는다.
 
 ### 트랜스크립트인 경우 수동 입력 필요한 frontmatter:
 
 
 ```yaml
-id: 10 Essential Software Design Patterns used in Java Core Libraries
+id: "10 Essential Software Design Patterns used in Java Core Libraries"
 aliases: Java 코어 라이브러리에서 사용되는 10가지 필수 소프트웨어 디자인 패턴
 tags:
-  - patterns/design-patterns/java-implementation
-  - patterns/creational/factory-singleton-builder
-  - patterns/structural/adapter-facade-proxy
-  - patterns/behavioral/observer-strategy-template
-  - java/core-libraries/design-patterns
-  - frameworks/java/standard-library
-  - development/practices/object-oriented-design
-  - architecture/patterns/gof-patterns
+  - dev/architecture
+  - dev/code-quality
+  - dev/java
+  - source/video
 author: ali-zeynalli
+tool: claude
 created: 2025-09-04 11:39
 related: []
 source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-used-in-java-core-libraries-bb8156ae279b
-tool: claude
+origin: library
 ```
 
 ### Frontmatter 필드 설명:

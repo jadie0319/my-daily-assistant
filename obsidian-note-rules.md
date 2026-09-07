@@ -59,7 +59,7 @@ origin: library                 # 가져온 것·AI 요약은 항상 library
 | `#`, `^` | 제거 | 위키링크의 헤딩·블록 앵커 |
 | `/ \ : * ? " < >` | ` -` 또는 제거 | 파일 시스템·Obsidian 금지 문자 |
 | 앞뒤 공백, 연속 공백 | 정리 | 끝 공백이 있으면 링크가 해석되지 않는다 |
-| 길이 | 80자 이내로 자른다 | |
+| 길이 | 120자 이내로 자른다 (기존 노트 중 88자 제목이 있어 80은 너무 짧다) | |
 
 ## 5. 저장 후: 관련 노트 링크 제안
 
@@ -72,6 +72,10 @@ cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-ru
 - 출력되는 제안 표(점수·관련 노트·근거)를 **완료 보고에 그대로 포함**한다.
 - **자동으로 `--apply` 하지 않는다.** 사용자가 표를 보고 `/inbox-link <제목>`으로 적용한다(GIGO 원칙).
 - 백그라운드 모드라 사용자에게 물을 수 없으면 제안만 남기고 끝낸다.
+
+## 5-1. 자동 검증 (hook) — 2026-09-07
+
+`.claude/settings.json`의 PostToolUse hook이 **Inbox 아래 `.md`를 Write/Edit할 때마다** `scripts/check_obsidian_note.py --fix --no-rename`을 자동 실행한다. 태그가 어휘표 밖이면 상위 태그로, `origin`·`related`가 없으면 채운다. 모델이 규칙을 잊거나 이미지 삽입 단계에서 노트를 다시 써도 마지막 쓰기 뒤에 다시 검증된다. 파일명은 hook에서 바꾸지 않으므로(작업 중인 파일이 사라지면 안 된다) 파일명 위반은 스킬의 마지막 검증 단계에서 `--fix`로 처리한다. hook 출력 `[inbox-check] … RESULT: OK`가 완료 보고에 보이면 정상.
 
 ## 6. 하지 않는 것
 

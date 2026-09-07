@@ -93,11 +93,49 @@ def load_tag_vocab(vault: str) -> list[str]:
     return sorted({t for t in tags if not t.endswith("/")})  # drop root rows like `ai/`
 
 
+
+def normalize_tags_to_vocab(markdown: str, allowed: list[str]) -> str:
+    """Deterministic backstop: replace tags outside the vocabulary with their nearest
+    existing ancestor; keep originals once in tags_original; list dropped ones in a comment."""
+    if not allowed:
+        return markdown
+    vocab = set(allowed)
+    m = re.match(r"(?s)^---\n(.*?)\n---\n?", markdown)
+    if not m:
+        return markdown
+    fm, body = m.group(1), markdown[m.end():]
+    tb = re.search(r"^tags:\s*\n((?:[ \t]+-[ \t]+.*\n?)+)", fm, re.M)
+    if not tb:
+        return markdown
+    tags = [x.strip().strip("\"'") for x in re.findall(r"-\s+(.*)", tb.group(1))]
+    new, dropped = [], []
+    for tag in tags:
+        cand = tag if tag in vocab else None
+        parts = tag.split("/")
+        while cand is None and len(parts) > 1:
+            parts = parts[:-1]
+            if "/".join(parts) in vocab:
+                cand = "/".join(parts)
+        if cand is None:
+            dropped.append(tag)
+        elif cand not in new:
+            new.append(cand)
+    if new == tags:
+        return markdown
+    block = "tags:\n" + "".join(f"  - {x}\n" for x in new)
+    if "tags_original:" not in fm:
+        block += "tags_original:\n" + "".join(f"  - {x}\n" for x in tags)
+    fm = fm[: tb.start()] + block + fm[tb.end():].lstrip("\n")
+    if dropped:
+        body = body.rstrip("\n") + "\n\n<!-- 태그 제안: " + ", ".join(dropped) + " (어휘표에 없어 제거됨) -->\n"
+    return f"---\n{fm.rstrip()}\n---\n\n{body.lstrip(chr(10))}"
+
+
 def clean_filename(value: str) -> str:
     cleaned = re.sub(r"\s*\|\s*", " - ", value)
     cleaned = re.sub(r"[\\/:*?\"<>#^]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned[:80].rstrip(" -") or "untitled"
+    return cleaned[:120].rstrip(" -") or "untitled"
 
 
 def normalize_author(author: str | None) -> str:
@@ -502,6 +540,7 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                     "origin": "library",
                 },
             )
+            summary = normalize_tags_to_vocab(summary, load_tag_vocab(vault))
 
             if user_input.mode == "url" and attachment_abs_dir is not None:
                 image_embeds, image_failures = download_images(images, attachment_abs_dir, attachment_rel_dir)
