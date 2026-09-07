@@ -77,10 +77,22 @@ def slugify(value: str, fallback: str = "manual") -> str:
     return slug or fallback
 
 
+
+def load_tag_vocab(vault: str) -> list[str]:
+    """Allowed tags = backticked values in {vault}/95.Vault/태그 어휘.md (see obsidian-note-rules.md)."""
+    try:
+        text = (Path(vault) / "95.Vault" / "태그 어휘.md").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    tags = re.findall(r"^\| `([a-z0-9/\-]+)` \|", text, re.M)
+    return sorted({t for t in tags if not t.endswith("/")})  # drop root rows like `ai/`
+
+
 def clean_filename(value: str) -> str:
-    cleaned = re.sub(r"[\\/:*?\"<>|]+", " ", value)
+    cleaned = re.sub(r"\s*\|\s*", " - ", value)
+    cleaned = re.sub(r"[\\/:*?\"<>#^]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned[:120] or "untitled"
+    return cleaned[:80].rstrip(" -") or "untitled"
 
 
 def channel_to_author(channel: str | None) -> str:
@@ -143,6 +155,7 @@ def build_prompt(
     author: str,
     created: str,
     source: str,
+    allowed_tags: list[str] | None = None,
 ) -> str:
     output_language = "Korean" if lang == "kr" else "English"
     translation_rule = (
@@ -166,7 +179,9 @@ Output constraints:
   6) related
   7) source
   8) tool
-- Keep tags hierarchical with '/' separators, lowercase, no spaces, max 6 tags.
+  9) origin
+- tags: choose 3 to 5 tags ONLY from this allowed vocabulary (lowercase, '/'-hierarchical), plus `source/video`. Never invent a tag; if nothing fits, use the closest parent tag and add an HTML comment `<!-- 태그 제안: ... -->` at the end of the body.
+  Allowed: {', '.join(allowed_tags) if allowed_tags else '(vocabulary file not found: use ai/ dev/ invest/ self/ productivity/ business/ roots only)'}
 - If uncertain, mark it explicitly in the body.
 - Include code examples or pseudocode if they are present in the transcript.
 
@@ -186,6 +201,7 @@ Use this metadata exactly:
 - created: {created}
 - source: {source}
 - tool: codex
+- origin: library
 
 Frontmatter template:
 ---
@@ -198,6 +214,7 @@ created: {yaml_quote(created)}
 related: []
 source: {yaml_quote(source)}
 tool: "codex"
+origin: "library"
 ---
 
 Now produce the final note.
@@ -309,6 +326,7 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                 author=author,
                 created=created,
                 source=source,
+                allowed_tags=load_tag_vocab(vault),
             )
             run_codex_summary(prompt, summary_file)
             summary = summary_file.read_text(encoding="utf-8").strip()
@@ -319,6 +337,7 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                     "author": yaml_quote(author),
                     "tool": "codex",
                     "source": yaml_quote(source),
+                    "origin": "library",
                 },
             )
             if not summary:

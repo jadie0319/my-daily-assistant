@@ -157,8 +157,12 @@ fi
     - 아래 규칙(`## 문서 번역 및 요약 규칙`)에 따라 내용을 정리해서 yaml frontmatter를 포함한 obsidian file로 저장
     - 저장 경로: `{YOUTUBE_OUTPUT_DIR}/YYYY-MM-DD {영상제목} (claude).md` (= `{OBSIDIAN_VAULT}{YOUTUBE_DIR}/YYYY-MM-DD {영상제목} (claude).md`)
     - 디렉터리가 없으면 생성: `mkdir -p "{YOUTUBE_OUTPUT_DIR}"`
-4. **태그 부여**
-    - hierarchical tagging 규칙은 `./add_tag.md` 에 정의된 규칙을 준수
+4. **태그·origin 부여** — 규칙은 `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md`
+    - 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에 있는 값만** 3~5개 + `source/video`. 먼저 그 파일을 Read 한다. 맞는 태그가 없으면 가장 가까운 상위 태그를 쓰고 새 태그는 만들지 않는다.
+    - 프론트매터에 `origin: library`를 넣는다(필수). `related: []`는 비워 둔다.
+    - 파일명: `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거, 80자 이내.
+4-1. **관련 노트 링크 제안** (저장 직후)
+    - `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 를 실행하고 제안 표를 완료 보고에 포함한다. **`--apply`는 하지 않는다**(사용자가 `/inbox-link`로 적용).
 5. **Progress 파일 업데이트 (백그라운드 모드 시)**
     
 
@@ -214,7 +218,10 @@ created: 2025-09-15 16:30
 related: []
 source: https://www.youtube.com/watch?v=lqQ_NL4y5Qg
 tool: claude
+origin: library
 ```
+
+> 위 예시의 태그는 옛 형식이다. 실제 값은 `95.Vault/태그 어휘.md`에서 고른다. 예: `ai/claude-code`, `ai/harness-engineering`, `dev/architecture`, `source/video`.
 
 ### 트랜스크립트인 경우 수동 입력 필요한 frontmatter:
 
@@ -244,6 +251,8 @@ tool: claude
 - **author**: YouTube 채널명 (자동 추출, 소문자, 공백은 '-'로 변경) 또는 문서 작성자
 - **created**: obsidian 파일 생성 시점 (자동 생성)
 - **source**: YouTube URL (자동 추출) 또는 문서 URL
+- **origin**: 항상 `library` (가져온 것·AI 요약). 사용자가 직접 쓴 노트만 `mine`
+- **tags**: `95.Vault/태그 어휘.md`의 값만, 3~5개 + `source/video`
 
 ## 문서 번역 및 요약 규칙
 

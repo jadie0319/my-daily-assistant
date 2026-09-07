@@ -174,7 +174,8 @@ WebFetch 결과에서 다음을 파악한다:
   - 날짜는 파일 생성 시점의 `date +%Y-%m-%d` 값 사용
   - 예: `2026-03-16 10 Essential Software Design Patterns.md`
 - 디렉터리가 없으면 생성: `mkdir -p "$ARTICLE_OUTPUT_DIR"`
-- hierarchical tagging 규칙: `~/.claude/commands/obsidian/add-tag.md` 준수
+- 태그·origin·파일명 규칙: `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 준수. 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`의 값만** 3~5개 + `source/article`(먼저 Read). 프론트매터에 `origin: library` 필수. 파일명은 `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거.
+- 저장 직후 `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 를 실행해 관련 노트 제안 표를 완료 보고에 포함한다. `--apply`는 하지 않는다.
 
 ### Step 3: 이미지 처리
 
@@ -323,13 +324,17 @@ tool: claude
 created: 2025-09-04 11:39
 related: []
 source: https://azeynalli1990.medium.com/10-essential-software-design-patterns-used-in-java-core-libraries-bb8156ae279b
+origin: library
 ```
+
+> 위 예시의 태그는 옛 형식이다. 실제 값은 `95.Vault/태그 어휘.md`에서 고른다(예: `dev/architecture`, `dev/code-quality`, `dev/java`, `source/article`).
 
 - id: 문서에서 발견한 제목 (WebFetch 또는 텍스트에서 추출한 title 사용). **콜론(`:`)이 포함된 경우 반드시 따옴표로 감쌀 것** (예: `id: "제목: 부제목"`)
 - aliases: 문서에서 발견한 제목의 한국어 번역
 - author: 문서에서 발견한 작성자. 이름은 다 소문자, 공백은 '-'로 변경. **텍스트 모드 또는 PDF 모드인 경우 빈 문자열**
 - created: obsidian 파일 생성 시점
 - source: 문서 url. **텍스트 모드인 경우 생략 또는 빈 문자열**. **PDF 모드인 경우 파일 절대 경로**
+- origin: 항상 `library`
 
 ## 문서 번역 및 요약 규칙
 

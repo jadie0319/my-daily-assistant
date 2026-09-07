@@ -57,3 +57,10 @@ Use this skill when the user wants Claude `/obsidian:summarize-article` behavior
 - `pdfplumber` for PDF input
 - `codex` CLI
 - outbound internet access for article/image download
+
+## Vault rules (2026-09-07)
+- Follow `obsidian-note-rules.md` at the repo root.
+- Tags come only from `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md` (3–5 tags + `source/article`); the script injects the allowed list into the prompt and never invents tags.
+- Frontmatter always includes `origin: library`; `related` stays `[]`.
+- Filenames: `|` → ` - `, `#`/`^` removed, trimmed, ≤80 chars.
+- After saving, run `python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<title>"` from the vault root and report the proposals; do not `--apply`.

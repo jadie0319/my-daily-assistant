@@ -46,24 +46,28 @@ CLAUDE.md에 포함되어 있던 Obsidian vault 작업 가이드(경로, 태그 
 
 검색 우선순위: `markdown-oxide LSP` →  `ripgrep` (단순 텍스트)
 
-### 2. Hierarchical Tags 체계
-- 형식: `#category/subcategory/detail`
-- 5가지 카테고리: Topic, Document Type, Source, Status, Project
-
-| 카테고리 | 예시 태그 |
-|---------|---------|
-| Topic | `#topic/engineering`, `#topic/leadership`, `#topic/ai` |
-| Document Type | `#type/til`, `#type/meeting`, `#type/article`, `#type/newsletter` |
-| Source | `#source/youtube`, `#source/book`, `#source/blog` |
-| Status | `#status/draft`, `#status/done`, `#status/archived` |
-| Project | `#project/active`, `#project/paused` |
+### 2. 태그·origin·related (2026-09-07 규칙)
+- 태그는 vault의 **`95.Vault/태그 어휘.md`** 에 있는 값만 쓴다(최상위 `ai/ dev/ invest/ self/ productivity/ business/ source/`, 노트당 3~5개). 옛 `#topic/…`, `#type/…`, `#status/…` 체계는 폐기됨. 새 태그가 필요하면 어휘표에 먼저 추가한다.
+- `origin: mine | library` — 내가 쓴 것 / 가져온 것·AI 요약. 인용할 때 어느 쪽인지 밝힌다.
+- `related:` — `"[[제목]]"` 목록. `inbox-link` 스킬(vault의 `.claude/skills/inbox-link/`)이 채운다. 검색은 이 필드와 본문 `## 관련 노트`를 먼저 따라간다.
+- 전체 규칙: `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md`, vault의 `CLAUDE.md`.
 
 ### 3. Zettelkasten 폴더 구조
 
-| 폴더          | 용도   | 작업 권한 |
-| ----------- | ---- | ----- |
-| `$INBOX_DIR` | 수집함  | 읽기/쓰기 |
-| `$NOTES_DIR` | 참고자료 | 주로 읽기 |
+| 폴더 | 용도 | 스킬 작업 권한 |
+| --- | --- | --- |
+| `$INBOX_DIR` (`/02.Zettelkasten/001_Inbox`) | 미검토 요약 캡처 (`origin: library`) | 읽기/쓰기 |
+| `$LIBRARY_DIR` (`/02.Zettelkasten/004_Library`) | 검토 끝난 외부 자료 원문 | 읽기만 (승격은 사용자) |
+| `$NOTES_DIR` (`/02.Zettelkasten/002_Notes`) | 사용자가 직접 쓴 영구 노트 (`origin: mine`) | 읽기만 |
+| `$MOC_DIR` (`/02.Zettelkasten/003_MOC`) | 개념 지도 | 읽기만 |
+| `$ATTACHMENT_DIR` (`/99.Attachments`) | 이미지 전용 | 쓰기(이미지만) |
+
+흐름: Inbox → (검토) Library → (내 말로 다시 쓰기) Notes → MOC.
+
+### 3-1. 검색 도구 순서
+1. **Obsidian CLI** (`obsidian search query=… path=…`, `read file=…`, `links`, `backlinks`, `tag name=…`) — Obsidian 실행 중일 때. 입구를 잡고 위키링크를 한두 홉 따라간다.
+2. markdown-oxide LSP (백링크·태그·진단)
+3. ripgrep (단순 텍스트)
 
 ### 4. 토큰 최적화 전략
 
@@ -101,7 +105,8 @@ CLAUDE.md에 포함되어 있던 Obsidian vault 작업 가이드(경로, 태그 
 | `$OBSIDIAN_VAULT`  | env.config에서 정의된 vault 루트 경로 |
 | `$DAILY_NOTE_DIR`  | env.config에서 정의된 daily notes 디렉토리 |
 | `$INBOX_DIR`       | env.config에서 정의된 수집함 경로      |
-| `$NOTES_DIR`       | env.config에서 정의된 참고자료 경로     |
+| `$NOTES_DIR`       | env.config에서 정의된 내 노트 경로 (읽기만) |
+| `$LIBRARY_DIR`, `$MOC_DIR` | env.config에서 정의된 Library·MOC 경로 (읽기만) |
 
 > **주의**: markdown-oxide LSP가 설정되어 있지 않으면 LSP 기능이 동작하지 않습니다.
 > 설치 확인: Claude Code에서 LSP 도구 사용 시 오류가 없는지 확인하세요.
