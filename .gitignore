@@ -3,5 +3,6 @@ env.config
 .codex/article-progress
 .nvimlog
 .DS_Store
+__pycache__/
+*.py[cod]
 .playwright-mcp/
-
