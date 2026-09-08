@@ -64,3 +64,4 @@ Use this skill when the user wants Claude `/obsidian:summarize-article` behavior
 - Frontmatter always includes `origin: library`; `related` stays `[]`.
 - Filenames: `|` → ` - `, `#`/`^` removed, trimmed, ≤120 chars.
 - After saving, run `python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<title>"` from the vault root and report the proposals; do not `--apply`.
+- Raw layer (2026-09-08): the script also saves the untouched transcript/article text to `{OBSIDIAN_VAULT}{RAW_DIR}/YYYY-MM-DD <title> (raw).md` (`type: raw`, `origin: library`, `summary: "[[…]]"`) and adds `raw: "[[… (raw)]]"` to the summary. Raw notes are excluded from linking, dashboard and embeddings.

@@ -13,8 +13,9 @@
 | `MOC_DIR` | `/02.Zettelkasten/003_MOC` — 스킬이 쓰지 않는다 |
 | `ATTACHMENT_DIR` | `/99.Attachments` — 이미지 전용. **`.md`를 여기 두지 않는다** |
 | `DAILY_NOTE_DIR` | `/04.Daily` |
+| `RAW_DIR` | `/02.Zettelkasten/000_Raw` — 요약의 원문. 스킬이 요약과 함께 쓴다 |
 
-스킬은 **Inbox와 Attachments에만 쓴다.** 그 외 폴더는 읽기만.
+스킬은 **Inbox, Raw, Attachments에만 쓴다.** 그 외 폴더는 읽기만.
 
 ## 2. 프론트매터 (Inbox 요약 노트)
 
@@ -41,6 +42,17 @@ origin: library                 # 가져온 것·AI 요약은 항상 library
 - `origin: library`는 **필수**. 사용자가 직접 쓴 것(`mine`)과 구분하는 표식이다.
 - `status`는 넣지 않는다(요약 노트 스키마에 없음).
 - `related`는 빈 배열로 둔다. 링크는 3절의 절차가 채운다.
+
+## 2-1. 원문 보관 (raw) — 2026-09-08
+
+요약을 저장할 때 **원문도 함께** `RAW_DIR`(`/02.Zettelkasten/000_Raw`)에 남긴다. 카파시 LLM Wiki의 `raw/` 층이다. "위키의 모든 주장은 원문으로 거슬러 갈 수 있어야 한다."
+
+- 파일명: 요약 노트와 같은 제목 + ` (raw)`. 예: `2026-09-08 제목 (raw).md`
+- 프론트매터: `type: raw`, `origin: library`, `source`, `summary: "[[요약 노트]]"`, `created`, `tool`. 태그 없음.
+- 본문: 트랜스크립트·기사 본문·PDF 텍스트를 **가공 없이** 그대로. 번역·요약 금지.
+- 요약 노트에는 `raw: "[[… (raw)]]"` 역참조를 넣는다.
+- raw 노트는 검색·링크·대시보드·임베딩 대상이 아니다(`inbox-link`와 대시보드는 `000_Raw`를 제외하도록 되어 있고, Smart Connections는 폴더 제외 설정에 `02.Zettelkasten/000_Raw`를 넣는다).
+- 원문을 못 구했으면(자막 없음 등) raw를 만들지 않고 완료 보고에 "raw 없음"을 적는다.
 
 ## 3. 태그: 어휘표에서만 고른다
 

@@ -18,7 +18,7 @@ YouTube URL 또는 트랜스크립트를 받아 **백그라운드**로 번역/�
 
 ### Step 0: env.config 읽기
 
-**반드시 Read 도구로 `/Users/jdragon/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`와 `YOUTUBE_DIR` 값을 추출한다.
+**반드시 Read 도구로 `/Users/jdragon/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `YOUTUBE_DIR`, `RAW_DIR` 값을 추출한다.
 
 ```shell
 ENV_CONFIG="/Users/jdragon/my-daily-assistant/env.config"
@@ -159,6 +159,24 @@ fi
     - 아래 규칙(`## 문서 번역 및 요약 규칙`)에 따라 내용을 정리해서 yaml frontmatter를 포함한 obsidian file로 저장
     - 저장 경로: `{YOUTUBE_OUTPUT_DIR}/YYYY-MM-DD {영상제목} (claude).md` (= `{OBSIDIAN_VAULT}{YOUTUBE_DIR}/YYYY-MM-DD {영상제목} (claude).md`)
     - 디렉터리가 없으면 생성: `mkdir -p "{YOUTUBE_OUTPUT_DIR}"`
+### 원문 보관 (raw) — 요약 저장 직후, 반드시
+`env.config`의 `RAW_DIR`(`/02.Zettelkasten/000_Raw`)에 트랜스크립트 원문을 별도 노트로 저장한다. 요약 노트와 같은 제목에 ` (raw)` 접미를 붙인다.
+
+```
+{OBSIDIAN_VAULT}{RAW_DIR}/YYYY-MM-DD {영상제목} (raw).md
+```
+```yaml
+---
+type: raw
+origin: library
+source: <YouTube URL>
+summary: "[[YYYY-MM-DD {영상제목} (claude)]]"
+created: YYYY-MM-DD HH:mm
+tool: claude
+---
+```
+본문은 `$YOUTUBE_TEMP_FILE`의 `transcript` 값 전체(가공 없이). 그리고 요약 노트 프론트매터 `source:` 다음 줄에 `raw: "[[YYYY-MM-DD {영상제목} (raw)]]"`를 추가한다. 원문이 없으면(트랜스크립트 실패) 이 단계를 건너뛰고 완료 보고에 "raw 없음"이라고 적는다.
+
 4. **태그·origin 부여** — 규칙은 `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md`
     - 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에 있는 값만** 3~5개 + `source/video`. 먼저 그 파일을 Read 한다. 맞는 태그가 없으면 가장 가까운 상위 태그를 쓰고 새 태그는 만들지 않는다.
     - 프론트매터에 `origin: library`를 넣는다(필수). `related: []`는 비워 둔다.

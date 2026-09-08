@@ -32,13 +32,14 @@ allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 
 ### Step 0: env.config 읽기
 
-**반드시 Read 도구로 `/Users/jdragon/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `ARTICLE_DIR`, `ATTACHMENT_DIR` 값을 추출한다.
+**반드시 Read 도구로 `/Users/jdragon/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `ARTICLE_DIR`, `ATTACHMENT_DIR`, `RAW_DIR` 값을 추출한다.
 
 ```shell
 ENV_CONFIG="/Users/jdragon/my-daily-assistant/env.config"
 OBSIDIAN_VAULT=$(grep '^OBSIDIAN_VAULT=' "$ENV_CONFIG" | cut -d'=' -f2-)
 ARTICLE_DIR=$(grep '^ARTICLE_DIR=' "$ENV_CONFIG" | cut -d'=' -f2-)
 ATTACHMENT_DIR=$(grep '^ATTACHMENT_DIR=' "$ENV_CONFIG" | cut -d'=' -f2-)
+RAW_DIR=$(grep '^RAW_DIR=' "$ENV_CONFIG" | cut -d'=' -f2-)
 
 # 최종 저장 디렉토리
 ARTICLE_OUTPUT_DIR="${OBSIDIAN_VAULT}${ARTICLE_DIR}"
@@ -178,6 +179,24 @@ WebFetch 결과에서 다음을 파악한다:
 - 디렉터리가 없으면 생성: `mkdir -p "$ARTICLE_OUTPUT_DIR"`
 - 태그·origin·파일명 규칙: `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 준수. 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`의 값만** 3~5개 + `source/article`(먼저 Read). 프론트매터에 `origin: library` 필수. 파일명은 `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거.
 - 저장 직후 `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 를 실행해 관련 노트 제안 표를 완료 보고에 포함한다. `--apply`는 하지 않는다.
+
+### 원문 보관 (raw) — 요약 저장 직후, 반드시
+`env.config`의 `RAW_DIR`(`/02.Zettelkasten/000_Raw`)에 추출한 원문(**title/author/content**의 content 전체, URL 모드는 WebFetch 결과 본문, PDF 모드는 청크를 합친 텍스트, 텍스트 모드는 입력 전문)을 별도 노트로 저장한다.
+
+```
+{OBSIDIAN_VAULT}{RAW_DIR}/YYYY-MM-DD {문서제목} (raw).md
+```
+```yaml
+---
+type: raw
+origin: library
+source: <URL 또는 PDF 절대경로, 텍스트 모드는 빈 문자열>
+summary: "[[YYYY-MM-DD {문서제목}]]"
+created: YYYY-MM-DD HH:mm
+tool: claude
+---
+```
+본문은 원문 그대로(번역·요약 금지). 이미지 링크는 원문 URL 그대로 둔다(다운로드하지 않음). 요약 노트 프론트매터 `source:` 다음 줄에 `raw: "[[YYYY-MM-DD {문서제목} (raw)]]"`를 추가한다.
 
 ### Step 3: 이미지 처리
 

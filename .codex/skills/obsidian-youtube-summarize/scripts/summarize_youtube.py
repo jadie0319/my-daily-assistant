@@ -126,6 +126,36 @@ def normalize_tags_to_vocab(markdown: str, allowed: list[str]) -> str:
     return f"---\n{fm.rstrip()}\n---\n\n{body.lstrip(chr(10))}"
 
 
+
+def write_raw_note(env_values: dict[str, str], *, title: str, source: str, created: str,
+                   summary_title: str, text: str) -> str | None:
+    """Karpathy-style raw layer: keep the untouched source text next to the summary.
+
+    Writes {OBSIDIAN_VAULT}{RAW_DIR}/YYYY-MM-DD <title> (raw).md and returns its stem
+    (for the summary's `raw:` back-reference), or None when there is no text.
+    See obsidian-note-rules.md §2-1.
+    """
+    if not text or not text.strip():
+        return None
+    vault = env_values.get("OBSIDIAN_VAULT")
+    raw_dir = env_values.get("RAW_DIR") or "/02.Zettelkasten/000_Raw"
+    out_dir = (Path(vault).expanduser() / raw_dir.lstrip("/")).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{datetime.now().strftime('%Y-%m-%d')} {clean_filename(title)} (raw)"
+    frontmatter = (
+        "---\n"
+        "type: raw\n"
+        "origin: library\n"
+        f"source: {yaml_quote(source)}\n"
+        f"summary: {yaml_quote('[[' + summary_title + ']]')}\n"
+        f"created: {yaml_quote(created)}\n"
+        "tool: codex\n"
+        "---\n\n"
+    )
+    (out_dir / f"{stem}.md").write_text(frontmatter + text.rstrip() + "\n", encoding="utf-8")
+    return stem
+
+
 def clean_filename(value: str) -> str:
     cleaned = re.sub(r"\s*\|\s*", " - ", value)
     cleaned = re.sub(r"[\\/:*?\"<>#^]+", " ", cleaned)
@@ -379,6 +409,12 @@ def run_worker(user_input: SummaryInput, progress_file: Path) -> int:
                 },
             )
             summary = normalize_tags_to_vocab(summary, load_tag_vocab(vault))
+            raw_stem = write_raw_note(
+                env_values, title=title, source=source, created=created,
+                summary_title=output_path.stem, text=transcript,
+            )
+            if raw_stem:
+                summary = ensure_frontmatter_properties(summary, {"raw": yaml_quote("[[" + raw_stem + "]]")})
             if not summary:
                 raise RuntimeError("codex returned empty summary")
 
