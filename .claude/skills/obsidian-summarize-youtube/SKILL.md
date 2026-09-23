@@ -109,9 +109,8 @@ echo "처리할 내용: $CLEANED_ARGUMENTS"
 if [[ "$CLEANED_ARGUMENTS" == *"youtube.com/watch?v="* ]] || [[ "$CLEANED_ARGUMENTS" == *"youtu.be/"* ]]; then
     echo "YouTube URL이 감지되었습니다. 메타데이터와 트랜스크립트를 다운로드합니다."
 
-    # Python 스크립트로 JSON 형식 데이터 추출 (이 파일과 같은 디렉토리의 스크립트 사용)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    SCRIPT_PATH="$SCRIPT_DIR/get_youtube_transcript.py"
+    # Python 스크립트로 JSON 형식 데이터 추출 (.claude/commands/obsidian/ 에 위치)
+    SCRIPT_PATH="/Users/jdragon/my-daily-assistant/.claude/commands/obsidian/get_youtube_transcript.py"
     echo "트랜스크립트 및 메타데이터 추출 중..."
     YOUTUBE_DATA=$(python3 "$SCRIPT_PATH" "$CLEANED_ARGUMENTS")
 
@@ -143,7 +142,7 @@ fi
     - 첫 번째 단어가 언어 옵션이면 제거하고 나머지를 실제 내용으로 처리
     - 정제된 내용이 YouTube URL인지 확인 (youtube.com/watch?v=, youtu.be/ 패턴)
     - URL인 경우:
-        - summarize_youtube.md 파일이 있는 폴더의 `get_youtube_transcript.py` 파일을 사용하여 JSON 형식으로 메타데이터와 트랜스크립트 추출
+        - `/Users/jdragon/my-daily-assistant/.claude/commands/obsidian/get_youtube_transcript.py`를 사용하여 JSON 형식으로 메타데이터와 트랜스크립트 추출
         - 언어 옵션에 따라 `-l kr` (한글 우선) 또는 `-l en` (영어 우선, 기본값)으로 실행
         - 첫 번째 언어 실패 시 대체 언어로 재시도
         - 고유한 임시 파일명(`/tmp/youtube_data_${VIDEO_ID}_${TIMESTAMP}.json`)을 사용하여 동시 실행 시 충돌 방지

@@ -29,7 +29,7 @@ The project currently supports these core workflows:
 4. **PDF Processing**: Extracts text and images from PDFs using PyMuPDF, supporting multi-page documents.
 
 ### Architecture Philosophy
-- **Slash commands** in `.claude/commands/obsidian/` drive interactive workflows
+- **Skills** in `.claude/skills/` drive interactive workflows (helper scripts live in `.claude/commands/obsidian/`)
 - **Python scripts** handle external integrations (YouTube transcript extraction, PDF image extraction)
 - **Configuration-driven**: `env.config` centralizes all paths and settings
 - **Obsidian-native output**: Notes follow Obsidian conventions (YAML frontmatter, wikilinks-ready formatting)

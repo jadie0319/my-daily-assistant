@@ -19,9 +19,11 @@ All environment settings are stored in `env.config` at the project root. Read th
 - **`YOUTUBE_DIR`**: Subdirectory within the vault for YouTube summaries.
 - **`ATTACHMENT_DIR`**: Subdirectory within the vault for downloaded images.
 
-## Slash Commands (`.claude/commands/obsidian/`)
+## Skills (`.claude/skills/`)
 
-### `summarize-article`
+Slash command 정의는 `.claude/skills/{name}/SKILL.md`에 있다. `.claude/commands/obsidian/`에는 스킬이 호출하는 Python 스크립트와 태그 참고 문서만 남아 있다.
+
+### `obsidian-summarize-article`
 
 Summarizes a technical document and saves it as an Obsidian note.
 
@@ -38,14 +40,14 @@ PDF mode specifics:
 - `source` in YAML frontmatter is set to the absolute file path
 - Images are extracted from PDF using `extract_pdf_images.py` and embedded in the note
 
-### `summarize-youtube`
+### `obsidian-summarize-youtube`
 
 Extracts transcript from a YouTube URL, translates/summarizes it, and saves as an Obsidian note.
 
 **Output filename format:** `YYYY-MM-DD {title} (claude).md`
 **Output path:** `{OBSIDIAN_VAULT}/{YOUTUBE_DIR}/`
 
-Uses `get_youtube_transcript.py` (in the same directory) to extract metadata and transcript via `youtube-transcript-api` and `yt-dlp`.
+Uses `.claude/commands/obsidian/get_youtube_transcript.py` to extract metadata and transcript via `youtube-transcript-api` and `yt-dlp`.
 
 ## Dependencies
 
@@ -63,6 +65,7 @@ The `youtube-transcript-api` uses instance-based `YouTubeTranscriptApi()` with `
 
 ## Architecture
 
-- **`.claude/commands/obsidian/`**: Slash commands for Claude Code interactive workflows
+- **`.claude/skills/`**: Skill definitions (`SKILL.md`) for Claude Code interactive workflows
+- **`.claude/commands/obsidian/`**: Python helper scripts (`get_youtube_transcript.py`, `extract_pdf_images.py`) and tagging reference docs used by the skills
 - **`.claude/article-progress/`**: JSON progress files for background summarization tasks
 - **`get_youtube_transcript.py`**: CLI script that extracts YouTube transcripts. Prefers Korean (`ko`), falls back to English (`en`).
