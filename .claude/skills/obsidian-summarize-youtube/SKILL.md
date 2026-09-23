@@ -7,6 +7,8 @@ allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 
 # youtube summarize - $ARGUMENTS
 
+> 경로 규칙: 이 문서의 `~/my-daily-assistant`·`$HOME/my-daily-assistant`는 이 Mac의 홈 아래 저장소다(회사 Mac `/Users/jdragon`, 개인 Mac `/Users/choejaeyong`). Read/Write 도구에 넣을 때는 `$HOME`을 절대 경로로 풀어서 쓴다. 이 스킬은 `~/.claude/skills/` 심볼릭 링크로 다른 프로젝트(Obsidian vault)에서도 실행되므로 상대 경로를 쓰지 않는다.
+
 YouTube URL 또는 트랜스크립트를 받아 **백그라운드**로 번역/정리하여 Obsidian 문서를 생성합니다.
 
 ## 실행 모드 판단
@@ -18,10 +20,10 @@ YouTube URL 또는 트랜스크립트를 받아 **백그라운드**로 번역/�
 
 ### Step 0: env.config 읽기
 
-**반드시 Read 도구로 `/Users/jdragon/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `YOUTUBE_DIR`, `RAW_DIR` 값을 추출한다.
+**반드시 Read 도구로 `~/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `YOUTUBE_DIR`, `RAW_DIR` 값을 추출한다.
 
 ```shell
-ENV_CONFIG="/Users/jdragon/my-daily-assistant/env.config"
+ENV_CONFIG="$HOME/my-daily-assistant/env.config"
 OBSIDIAN_VAULT=$(grep '^OBSIDIAN_VAULT=' "$ENV_CONFIG" | cut -d'=' -f2-)
 YOUTUBE_DIR=$(grep '^YOUTUBE_DIR=' "$ENV_CONFIG" | cut -d'=' -f2-)
 
@@ -35,7 +37,7 @@ YOUTUBE_OUTPUT_DIR="${OBSIDIAN_VAULT}${YOUTUBE_DIR}"
 
 [](https://github.com/msbaek/dotfiles/blob/main/.claude/commands/obsidian/summarize-youtube.md#step-1-progress-%ED%8C%8C%EC%9D%BC-%EC%83%9D%EC%84%B1)
 
-`.claude/article-progress/` 디렉토리에 진행 상황 파일을 생성합니다. 파일명: `YYYYMMDD-HHMMSS-youtube-{video-id-or-slug}.json`
+`~/my-daily-assistant/.claude/article-progress/` 디렉토리에 진행 상황 파일을 생성합니다. 파일명: `YYYYMMDD-HHMMSS-youtube-{video-id-or-slug}.json`
 
 ```json
 {
@@ -60,7 +62,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
     - progress 파일 경로를 전달
     - 작업 완료 후 progress 파일을 completed로 업데이트하도록 지시
     - 실패 시 progress 파일을 failed로 업데이트하도록 지시
-    - **`/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
+    - **`~/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
     - 저장 후 `scripts/check_obsidian_note.py --fix`와 `inbox-link --dry-run`을 실행하고 결과를 progress 파일 `notes` 필드와 완료 보고에 남기도록 지시
 
 ### Step 3: 사용자에게 알림 후 즉시 반환
@@ -69,7 +71,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 ```
 백그라운드 작업 시작됨:
 - URL: $ARGUMENTS
-- Progress: .claude/article-progress/{파일명}.json
+- Progress: ~/my-daily-assistant/.claude/article-progress/{파일명}.json
 - 완료되면 자동으로 알려드립니다.
 ```
 
@@ -110,7 +112,7 @@ if [[ "$CLEANED_ARGUMENTS" == *"youtube.com/watch?v="* ]] || [[ "$CLEANED_ARGUME
     echo "YouTube URL이 감지되었습니다. 메타데이터와 트랜스크립트를 다운로드합니다."
 
     # Python 스크립트로 JSON 형식 데이터 추출 (.claude/commands/obsidian/ 에 위치)
-    SCRIPT_PATH="/Users/jdragon/my-daily-assistant/.claude/commands/obsidian/get_youtube_transcript.py"
+    SCRIPT_PATH="$HOME/my-daily-assistant/.claude/commands/obsidian/get_youtube_transcript.py"
     echo "트랜스크립트 및 메타데이터 추출 중..."
     YOUTUBE_DATA=$(python3 "$SCRIPT_PATH" "$CLEANED_ARGUMENTS")
 
@@ -142,7 +144,7 @@ fi
     - 첫 번째 단어가 언어 옵션이면 제거하고 나머지를 실제 내용으로 처리
     - 정제된 내용이 YouTube URL인지 확인 (youtube.com/watch?v=, youtu.be/ 패턴)
     - URL인 경우:
-        - `/Users/jdragon/my-daily-assistant/.claude/commands/obsidian/get_youtube_transcript.py`를 사용하여 JSON 형식으로 메타데이터와 트랜스크립트 추출
+        - `~/my-daily-assistant/.claude/commands/obsidian/get_youtube_transcript.py`를 사용하여 JSON 형식으로 메타데이터와 트랜스크립트 추출
         - 언어 옵션에 따라 `-l kr` (한글 우선) 또는 `-l en` (영어 우선, 기본값)으로 실행
         - 첫 번째 언어 실패 시 대체 언어로 재시도
         - 고유한 임시 파일명(`/tmp/youtube_data_${VIDEO_ID}_${TIMESTAMP}.json`)을 사용하여 동시 실행 시 충돌 방지
@@ -176,7 +178,7 @@ tool: claude
 ```
 본문은 `$YOUTUBE_TEMP_FILE`의 `transcript` 값 전체(가공 없이). 그리고 요약 노트 프론트매터 `source:` 다음 줄에 `raw: "[[YYYY-MM-DD {영상제목} (raw)]]"`를 추가한다. 원문이 없으면(트랜스크립트 실패) 이 단계를 건너뛰고 완료 보고에 "raw 없음"이라고 적는다.
 
-4. **태그·origin 부여** — 규칙은 `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md`
+4. **태그·origin 부여** — 규칙은 `~/my-daily-assistant/obsidian-note-rules.md`
     - 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에 있는 값만** 3~5개 + `source/video`. 먼저 그 파일을 Read 한다. 맞는 태그가 없으면 가장 가까운 상위 태그를 쓰고 새 태그는 만들지 않는다.
     - 프론트매터에 `origin: library`를 넣는다(필수). `related: []`는 비워 둔다.
     - 파일명: `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거, 120자 이내.
@@ -226,7 +228,7 @@ rm -f "$YOUTUBE_TEMP_FILE"
 저장한 노트에 대해 **반드시** 아래를 실행한다. 프롬프트 규칙과 무관하게 어휘표 밖 태그를 상위 태그로 바꾸고 `origin: library`를 보장한다.
 
 ```bash
-python3 /Users/jdragon/my-daily-assistant/scripts/check_obsidian_note.py "<저장한 노트 절대경로>" --fix
+python3 ~/my-daily-assistant/scripts/check_obsidian_note.py "<저장한 노트 절대경로>" --fix
 ```
 
 - 출력의 `RESULT: OK`를 확인한다. `FAIL`이면 남은 위반을 완료 보고에 그대로 적는다.
@@ -340,7 +342,7 @@ process.
 
 메인 세션에서 현재 진행 중인 백그라운드 작업을 확인하려면:
 
-`.claude/article-progress/` 폴더의 JSON 파일들을 읽어서 상태를 보고합니다:
+`~/my-daily-assistant/.claude/article-progress/` 폴더의 JSON 파일들을 읽어서 상태를 보고합니다:
 
 - `processing`: "처리 중: URL"
 - `completed`: "완료: URL → 파일경로"

@@ -7,6 +7,8 @@ allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 
 # article summarize - $ARGUMENTS
 
+> 경로 규칙: 이 문서의 `~/my-daily-assistant`·`$HOME/my-daily-assistant`는 이 Mac의 홈 아래 저장소다(회사 Mac `/Users/jdragon`, 개인 Mac `/Users/choejaeyong`). Read/Write 도구에 넣을 때는 `$HOME`을 절대 경로로 풀어서 쓴다. 이 스킬은 `~/.claude/skills/` 심볼릭 링크로 다른 프로젝트(Obsidian vault)에서도 실행되므로 상대 경로를 쓰지 않는다.
+
 기술 문서 URL, 텍스트, 또는 로컬 PDF 파일을 받아 **백그라운드**로 번역/정리하여 Obsidian 문서를 생성합니다.
 
 ## 입력 타입 판별
@@ -32,10 +34,10 @@ allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 
 ### Step 0: env.config 읽기
 
-**반드시 Read 도구로 `/Users/jdragon/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `ARTICLE_DIR`, `ATTACHMENT_DIR`, `RAW_DIR` 값을 추출한다.
+**반드시 Read 도구로 `~/my-daily-assistant/env.config` 파일을 읽은 뒤** `OBSIDIAN_VAULT`, `ARTICLE_DIR`, `ATTACHMENT_DIR`, `RAW_DIR` 값을 추출한다.
 
 ```shell
-ENV_CONFIG="/Users/jdragon/my-daily-assistant/env.config"
+ENV_CONFIG="$HOME/my-daily-assistant/env.config"
 OBSIDIAN_VAULT=$(grep '^OBSIDIAN_VAULT=' "$ENV_CONFIG" | cut -d'=' -f2-)
 ARTICLE_DIR=$(grep '^ARTICLE_DIR=' "$ENV_CONFIG" | cut -d'=' -f2-)
 ATTACHMENT_DIR=$(grep '^ATTACHMENT_DIR=' "$ENV_CONFIG" | cut -d'=' -f2-)
@@ -50,7 +52,7 @@ ATTACHMENT_OUTPUT_DIR="${OBSIDIAN_VAULT}${ATTACHMENT_DIR}"
 
 ### Step 1: Progress 파일 생성
 
-`.claude/article-progress/` 디렉토리에 진행 상황 파일을 생성합니다.
+`~/my-daily-assistant/.claude/article-progress/` 디렉토리에 진행 상황 파일을 생성합니다.
 
 **URL 모드** 파일명: `YYYYMMDD-HHMMSS-{url-slug}.json`
 ```json
@@ -105,7 +107,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
   - 작업 완료 후 progress 파일을 completed로 업데이트하도록 지시
   - 실패 시 progress 파일을 failed로 업데이트하도록 지시
   - **텍스트 모드인 경우**: `$ARGUMENTS` 전체 텍스트를 prompt에 포함하여 전달
-  - **`/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
+  - **`~/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
   - 저장 후 `scripts/check_obsidian_note.py --fix`와 `inbox-link --dry-run`을 실행하고 결과를 완료 보고에 남기도록 지시
 
 ### Step 3: 사용자에게 알림 후 즉시 반환
@@ -114,7 +116,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 ```
 백그라운드 작업 시작됨:
 - URL: $ARGUMENTS
-- Progress: .claude/article-progress/{파일명}.json
+- Progress: ~/my-daily-assistant/.claude/article-progress/{파일명}.json
 - 완료되면 자동으로 알려드립니다.
 ```
 
@@ -122,7 +124,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 ```
 백그라운드 작업 시작됨:
 - 입력: 텍스트 ({글자수}자)
-- Progress: .claude/article-progress/{파일명}.json
+- Progress: ~/my-daily-assistant/.claude/article-progress/{파일명}.json
 - 완료되면 자동으로 알려드립니다.
 ```
 
@@ -130,7 +132,7 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 ```
 백그라운드 작업 시작됨:
 - PDF: $ARGUMENTS
-- Progress: .claude/article-progress/{파일명}.json
+- Progress: ~/my-daily-assistant/.claude/article-progress/{파일명}.json
 - 완료되면 자동으로 알려드립니다.
 ```
 
@@ -177,7 +179,7 @@ WebFetch 결과에서 다음을 파악한다:
   - 날짜는 파일 생성 시점의 `date +%Y-%m-%d` 값 사용
   - 예: `2026-03-16 10 Essential Software Design Patterns.md`
 - 디렉터리가 없으면 생성: `mkdir -p "$ARTICLE_OUTPUT_DIR"`
-- 태그·origin·파일명 규칙: `/Users/jdragon/my-daily-assistant/obsidian-note-rules.md` 준수. 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`의 값만** 3~5개 + `source/article`(먼저 Read). 프론트매터에 `origin: library` 필수. 파일명은 `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거.
+- 태그·origin·파일명 규칙: `~/my-daily-assistant/obsidian-note-rules.md` 준수. 태그는 **`{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`의 값만** 3~5개 + `source/article`(먼저 Read). 프론트매터에 `origin: library` 필수. 파일명은 `|`→` - `, `#`·`^` 제거, 앞뒤 공백 제거.
 - 저장 직후 `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 를 실행해 관련 노트 제안 표를 완료 보고에 포함한다. `--apply`는 하지 않는다.
 
 ### 원문 보관 (raw) — 요약 저장 직후, 반드시
@@ -251,7 +253,7 @@ curl -sL --max-time 15 --max-filesize 10485760 \
 #### PDF 이미지 추출
 
 ```bash
-python3 /Users/jdragon/my-daily-assistant/.claude/commands/obsidian/extract_pdf_images.py \
+python3 ~/my-daily-assistant/.claude/commands/obsidian/extract_pdf_images.py \
   --pdf "$ARGUMENTS" \
   --output-dir "$ATTACHMENT_OUTPUT_DIR" \
   --prefix "{YYYYMMDD}-{pdf-title-slug-30자}" \
@@ -331,7 +333,7 @@ progress 파일 경로가 전달된 경우, 작업 완료/실패 시 업데이�
 저장한 노트에 대해 **반드시** 아래를 실행한다. 프롬프트 규칙과 무관하게 어휘표 밖 태그를 상위 태그로 바꾸고 `origin: library`를 보장한다.
 
 ```bash
-python3 /Users/jdragon/my-daily-assistant/scripts/check_obsidian_note.py "<저장한 노트 절대경로>" --fix
+python3 ~/my-daily-assistant/scripts/check_obsidian_note.py "<저장한 노트 절대경로>" --fix
 ```
 
 - 출력의 `RESULT: OK`를 확인한다. `FAIL`이면 남은 위반을 완료 보고에 그대로 적는다.
@@ -420,7 +422,7 @@ Remember to include all necessary subsections as described in the summary struct
 
 메인 세션에서 현재 진행 중인 백그라운드 작업을 확인하려면:
 
-`.claude/article-progress/` 폴더의 JSON 파일들을 읽어서 상태를 보고합니다:
+`~/my-daily-assistant/.claude/article-progress/` 폴더의 JSON 파일들을 읽어서 상태를 보고합니다:
 - `processing`: "처리 중: {url 또는 file 경로}"
 - `completed`: "완료: {url 또는 file 경로} → 파일경로"
 - `failed`: "실패: {url 또는 file 경로} (에러메시지)"
