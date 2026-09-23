@@ -1,7 +1,7 @@
 ---
 name: obsidian:summarize-article
-argument-hint: "[url, 텍스트, 또는 PDF 파일 경로]"
-description: "기술 문서 URL, 텍스트, 또는 로컬 PDF 파일 → 번역/정리 → env.config 의 ARTICLE_DIR 을 참고해서 obsidian 문서 생성"
+argument-hint: "[url, 텍스트, PDF 파일 경로, 또는 txt/md 파일 경로]"
+description: "기술 문서 URL, 텍스트, 로컬 PDF 파일, 또는 로컬 txt/md 파일 → 번역/정리 → env.config 의 ARTICLE_DIR 을 참고해서 obsidian 문서 생성"
 allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 ---
 
@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 
 > 경로 규칙: 이 문서의 `~/my-daily-assistant`·`$HOME/my-daily-assistant`는 이 Mac의 홈 아래 저장소다(회사 Mac `/Users/jdragon`, 개인 Mac `/Users/choejaeyong`). Read/Write 도구에 넣을 때는 `$HOME`을 절대 경로로 풀어서 쓴다. 이 스킬은 `~/.claude/skills/` 심볼릭 링크로 다른 프로젝트(Obsidian vault)에서도 실행되므로 상대 경로를 쓰지 않는다.
 
-기술 문서 URL, 텍스트, 또는 로컬 PDF 파일을 받아 **백그라운드**로 번역/정리하여 Obsidian 문서를 생성합니다.
+기술 문서 URL, 텍스트, 로컬 PDF 파일, 또는 로컬 텍스트 파일(txt/md)을 받아 **백그라운드**로 번역/정리하여 Obsidian 문서를 생성합니다.
 
 ## 입력 타입 판별
 
@@ -17,7 +17,11 @@ allowed-tools: Read, Write, Edit, Bash, WebFetch, Agent
 
 1. `http://` 또는 `https://`로 시작하면 → **URL 모드**
 2. `.pdf`로 끝남 (대소문자 무관) 또는 `file://`로 시작하면 → **PDF 모드**
-3. 그 외 → **텍스트 모드**
+3. `.txt`, `.md`, `.markdown`으로 끝남 (대소문자 무관) → **텍스트 파일 모드**
+4. 위에 해당하지 않지만 `$ARGUMENTS`가 200자 미만이고 Bash `test -f "$ARGUMENTS"`가 참이면 → **텍스트 파일 모드** (확장자가 없거나 다른 텍스트 파일)
+5. 그 외 → **텍스트 모드**
+
+텍스트 파일 모드는 파일 **경로**만 받는다. 파일 내용은 서브에이전트가 직접 읽으므로 메인 세션에서 파일을 읽어 prompt에 넣지 않는다.
 
 텍스트 모드에서 `$ARGUMENTS`가 200자 미만이면 경고를 출력한다:
 ```
@@ -93,6 +97,19 @@ ATTACHMENT_OUTPUT_DIR="${OBSIDIAN_VAULT}${ATTACHMENT_DIR}"
 }
 ```
 
+**텍스트 파일 모드** 파일명: `YYYYMMDD-HHMMSS-file-{파일명-stem-30자}.json` (스키마는 PDF 모드와 동일, `file` 키에 절대 경로)
+```json
+{
+  "file": "$ARGUMENTS 의 절대 경로",
+  "type": "article",
+  "status": "processing",
+  "started_at": "현재시간 ISO-8601",
+  "completed_at": null,
+  "output_file": null,
+  "error": null
+}
+```
+
 ### Step 2: 백그라운드 subagent 시작
 
 Task tool을 사용하여 백그라운드 subagent를 시작합니다:
@@ -102,11 +119,13 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 - **URL 모드** `description`: "Summarize: {URL 도메인/경로 일부}"
 - **텍스트 모드** `description`: "Summarize text: {텍스트 앞 30자}"
 - **PDF 모드** `description`: "Summarize PDF: {파일명 without extension}"
+- **텍스트 파일 모드** `description`: "Summarize file: {파일명 without extension}"
 - `prompt`: 아래 동기 모드 프로세스 전체를 포함하되, 다음을 추가:
   - progress 파일 경로를 전달
   - 작업 완료 후 progress 파일을 completed로 업데이트하도록 지시
   - 실패 시 progress 파일을 failed로 업데이트하도록 지시
   - **텍스트 모드인 경우**: `$ARGUMENTS` 전체 텍스트를 prompt에 포함하여 전달
+  - **텍스트 파일 모드인 경우**: 파일의 **절대 경로**만 prompt에 전달 (`realpath "$ARGUMENTS"`). 내용은 서브에이전트가 읽는다
   - **`~/my-daily-assistant/obsidian-note-rules.md` 전문과, `{OBSIDIAN_VAULT}/95.Vault/태그 어휘.md`에서 읽은 허용 태그 목록을 prompt에 그대로 포함**한다(서브에이전트는 이 파일들을 스스로 읽지 않을 수 있다)
   - 저장 후 `scripts/check_obsidian_note.py --fix`와 `inbox-link --dry-run`을 실행하고 결과를 완료 보고에 남기도록 지시
 
@@ -132,6 +151,14 @@ Task tool을 사용하여 백그라운드 subagent를 시작합니다:
 ```
 백그라운드 작업 시작됨:
 - PDF: $ARGUMENTS
+- Progress: ~/my-daily-assistant/.claude/article-progress/{파일명}.json
+- 완료되면 자동으로 알려드립니다.
+```
+
+**텍스트 파일 모드:**
+```
+백그라운드 작업 시작됨:
+- 파일: {절대 경로}
 - Progress: ~/my-daily-assistant/.claude/article-progress/{파일명}.json
 - 완료되면 자동으로 알려드립니다.
 ```
@@ -165,6 +192,29 @@ WebFetch 결과에서 다음을 파악한다:
 5. **content**: 모든 청크를 합친 전체 텍스트
 6. content가 100자 미만이면 빈 PDF 또는 이미지 전용 PDF로 판단 → progress 파일을 `failed`로 업데이트 후 중단
 
+**텍스트 파일 모드**: 로컬 txt/md 파일을 Read 도구로 읽어 콘텐츠를 추출한다.
+
+1. **파일 존재 확인**: Bash `test -f "{절대 경로}"`. 없으면 progress 파일을 `failed`로 업데이트하고 중단
+2. **인코딩 확인**: `file -I "{절대 경로}"` 결과의 charset이 `utf-8`, `us-ascii`가 아니면(예: `iso-8859-1`, `unknown-8bit` — 한글 CP949 파일이 흔함) UTF-8 사본을 만들어 그 사본을 읽는다:
+   ```bash
+   TMP_DIR="$(mktemp -d)"
+   iconv -f CP949 -t UTF-8 "{절대 경로}" > "$TMP_DIR/{파일명-stem}.utf8.txt"
+   ```
+   (세션 scratchpad 디렉토리가 안내되어 있으면 `mktemp -d` 대신 그곳을 사용)
+   iconv가 실패하면 원본을 그대로 읽고, 완료 보고에 "(불확실) 인코딩 변환 실패" 를 남긴다
+3. **콘텐츠 추출**: `wc -l`로 줄 수를 확인한 뒤 Read 도구로 읽는다. 2000줄을 넘으면 `offset`/`limit`으로 2000줄씩 나눠 읽고 순서대로 concat
+4. **title** (내용 기반. 파일명은 마지막 fallback):
+   - `.md`/`.markdown`: 본문의 첫 번째 `# ` 헤딩(`#` 한 개). 없으면 아래 `.txt` 규칙을 따른다
+   - `.txt` 및 그 외: 파일명은 `webinar-captions-auto-2014.txt` 처럼 내용을 설명하지 않는 경우가 많으므로 **본문에서 제목을 뽑는다**. 순서대로 시도:
+     1. **명시된 제목**: 첫 비어 있지 않은 줄이 제목처럼 보이면(80자 이하, 타임스탬프 `[HH:MM:SS]` 없음, 문장 부호로 끝나지 않음, 본문과 빈 줄로 구분) 그 줄을 사용
+     2. **내용 요약 제목**: 명시된 제목이 없으면(자막·트랜스크립트·메모 등) 본문 전체를 읽은 뒤 주제를 나타내는 제목을 **원문 언어로** 직접 짓는다. 60자 이내, 고유명사(행사명·회사·발표자·제품)가 확인되면 포함. 예: `DX Webinar: AI Software Factories and Redesigning the SDLC`
+     3. **fallback**: 본문이 300자 미만이거나 주제를 특정할 수 없으면 파일명에서 경로와 확장자 제거, `-`와 `_`를 공백으로 치환 (PDF 모드와 동일)
+   - 어떤 규칙으로 제목을 정했는지 완료 보고에 한 줄로 남긴다 (예: "제목: 내용 요약 제목 규칙 적용, 원 파일명 webinar-captions-auto-2014.txt")
+   - 노트 파일명·raw 노트 파일명·`id`·`summary`/`raw` 역참조 모두 이 title을 사용한다. 원본 파일 경로는 `source`에 남으므로 파일명을 제목에 넣지 않는다
+5. **author**: 빈 문자열 (md frontmatter에 `author:` 가 있으면 그 값을 사용)
+6. **content**: 파일 전체 텍스트. md 파일에 YAML frontmatter가 있으면 frontmatter를 제외한 본문만 사용
+7. content가 100자 미만이면 빈 파일로 판단 → progress 파일을 `failed`로 업데이트 후 중단
+
 **텍스트 모드**: WebFetch를 스킵하고 다음을 설정한다.
 
 - **title**: 텍스트에서 첫 번째 `#` 마크다운 헤딩을 추출. 없으면 첫 문장(최대 80자)을 title로 사용
@@ -183,7 +233,7 @@ WebFetch 결과에서 다음을 파악한다:
 - 저장 직후 `cd "$OBSIDIAN_VAULT" && python3 .claude/skills/inbox-link/link_inbox.py --dry-run "<노트 제목>"` 를 실행해 관련 노트 제안 표를 완료 보고에 포함한다. `--apply`는 하지 않는다.
 
 ### 원문 보관 (raw) — 요약 저장 직후, 반드시
-`env.config`의 `RAW_DIR`(`/02.Zettelkasten/000_Raw`)에 추출한 원문(**title/author/content**의 content 전체, URL 모드는 WebFetch 결과 본문, PDF 모드는 청크를 합친 텍스트, 텍스트 모드는 입력 전문)을 별도 노트로 저장한다.
+`env.config`의 `RAW_DIR`(`/02.Zettelkasten/000_Raw`)에 추출한 원문(**title/author/content**의 content 전체, URL 모드는 WebFetch 결과 본문, PDF 모드는 청크를 합친 텍스트, 텍스트 파일 모드는 파일 전문, 텍스트 모드는 입력 전문)을 별도 노트로 저장한다.
 
 ```
 {OBSIDIAN_VAULT}{RAW_DIR}/YYYY-MM-DD {문서제목} (raw).md
@@ -192,7 +242,7 @@ WebFetch 결과에서 다음을 파악한다:
 ---
 type: raw
 origin: library
-source: <URL 또는 PDF 절대경로, 텍스트 모드는 빈 문자열>
+source: <URL, PDF 절대경로, 또는 텍스트 파일 절대경로. 텍스트 모드는 빈 문자열>
 summary: "[[YYYY-MM-DD {문서제목}]]"
 created: YYYY-MM-DD HH:mm
 tool: claude
@@ -203,6 +253,8 @@ tool: claude
 ### Step 3: 이미지 처리
 
 **텍스트 모드인 경우 이 단계를 완전히 스킵한다.**
+
+**텍스트 파일 모드**: `.txt`는 이 단계를 완전히 스킵한다. `.md`/`.markdown`은 본문의 `![alt](url)` 중 `http://`/`https://`로 시작하는 **원격 URL 이미지만** 아래 URL 모드 규칙과 동일하게 다운로드·필터링·임베딩한다. 상대 경로나 로컬 절대 경로로 참조된 이미지는 처리하지 않고, 완료 보고에 "로컬 이미지 N개는 첨부하지 않음"으로 남긴다.
 
 **URL 모드**: WebFetch 결과에 이미지 URL이 포함된 경우, ATTACHMENTS 폴더에 저장하고 Obsidian 문서에 포함시킵니다.
 
@@ -362,9 +414,9 @@ origin: library
 
 - id: 문서에서 발견한 제목 (WebFetch 또는 텍스트에서 추출한 title 사용). **콜론(`:`)이 포함된 경우 반드시 따옴표로 감쌀 것** (예: `id: "제목: 부제목"`)
 - aliases: 문서에서 발견한 제목의 한국어 번역
-- author: 문서에서 발견한 작성자. 이름은 다 소문자, 공백은 '-'로 변경. **텍스트 모드 또는 PDF 모드인 경우 빈 문자열**
+- author: 문서에서 발견한 작성자. 이름은 다 소문자, 공백은 '-'로 변경. **텍스트 모드 또는 PDF 모드인 경우 빈 문자열**. 텍스트 파일 모드는 md frontmatter에 `author`가 있을 때만 그 값, 없으면 빈 문자열
 - created: obsidian 파일 생성 시점
-- source: 문서 url. **텍스트 모드인 경우 생략 또는 빈 문자열**. **PDF 모드인 경우 파일 절대 경로**
+- source: 문서 url. **텍스트 모드인 경우 생략 또는 빈 문자열**. **PDF 모드와 텍스트 파일 모드인 경우 파일 절대 경로**
 - origin: 항상 `library`
 
 ## 문서 번역 및 요약 규칙

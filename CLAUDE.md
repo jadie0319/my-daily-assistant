@@ -30,7 +30,8 @@ Summarizes a technical document and saves it as an Obsidian note.
 **Supported input modes:**
 1. URL (`http://` or `https://`) → fetches with WebFetch
 2. Local PDF (ends with `.pdf` or starts with `file://`) → reads with Read tool (10-page chunks)
-3. Plain text → used directly
+3. Local text file (ends with `.txt`, `.md`, `.markdown`, or a short argument that is an existing file) → reads with Read tool; CP949 files are converted to UTF-8 via `iconv` first. Title comes from the content (md `#` heading → explicit title line → summarized topic title), filename only as fallback
+4. Plain text → used directly
 
 **Output filename format:** `YYYY-MM-DD {title}.md`
 **Output path:** `{OBSIDIAN_VAULT}/{ARTICLE_DIR}/`
