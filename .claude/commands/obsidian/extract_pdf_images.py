@@ -16,14 +16,18 @@ import os
 import sys
 
 try:
-    import fitz
+    # PyMuPDF 1.24.3+ 의 정식 모듈명. 1.28부터 `import fitz`는 deprecated 경고를 낸다.
+    import pymupdf as fitz
 except ImportError:
-    print(
-        "PyMuPDF 라이브러리를 찾을 수 없습니다. "
-        "설치하려면: pip3 install PyMuPDF",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    try:
+        import fitz  # PyMuPDF 1.24.3 미만
+    except ImportError:
+        print(
+            "PyMuPDF 라이브러리를 찾을 수 없습니다. "
+            "설치하려면: python3 -m pip install PyMuPDF",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "avif"}
 
