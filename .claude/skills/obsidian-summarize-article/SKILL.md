@@ -450,7 +450,7 @@ Summary structure:
    - Provide your perspective on why this information is important.
 
 Important considerations:
-- The target audience is a Korean software developer with over 25 years of experience, who obtained a Computer Science degree and a master's degree in Korea, specializing in object-oriented analysis & design and software architecture.
+- The target audience is a Korean backend software developer with 7 years of experience, who obtained a Computer Science bachelor's degree in Korea, specializing in object-oriented analysis & design and software architecture.
 - They have extensive experience in developing and operating various services and products.
 - They are particularly interested in sustainable software system development, OOP, developer capability enhancement, Java, TDD, Design Patterns, Refactoring, DDD, Clean Code, Architecture (MSA, Modulith, Layered, Hexagonal, vertical slicing), Code Review, Agile (Lean) Development, Spring Boot, building development organizations, improving development culture, developer growth, and coaching.
 - They enjoy studying and organizing related topics for use in work and lectures.

@@ -289,8 +289,8 @@ origin: library
 
 ```
 Target Audience:
-- Obtained a Computer Science degree and a master's degree in Korea
-- Has worked as a software developer for over 25 years, developing and maintaining various services and products
+- Obtained a Computer Science bachelor's degree in Korea
+- Has worked as a backend software developer for 7 years, developing and maintaining various services and products
 - Cannot quickly read or watch content in English
 - Interested in sustainable software system development, OOP, developer capability enhancement, Java, TDD, Design Patterns, Refactoring, DDD, Clean Code, Architecture (MSA, Modulith, Layered, Hexagonal, vertical slicing), Code Review, Agile (Lean) Development, Spring Boot, building development organizations and improving development culture, developer growth, and coaching
 - Enjoys studying and organizing related topics for use in work and lectures
